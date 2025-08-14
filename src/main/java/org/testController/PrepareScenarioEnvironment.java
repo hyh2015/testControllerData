@@ -73,6 +73,12 @@ public class PrepareScenarioEnvironment {
             }
 
             logger.info("已存在 " + renamedTable + " 表");
+            // 非第一次执行场景3 只需要清空record table1
+            try(Statement stmtTruncate = conn.createStatement()){
+                stmtTruncate.execute("TRUNCATE TABLE "+ recordTable1);
+                logger.info("[场景3] 清空 "+ recordTable1 + " 表成功");
+            }
+
             return prepareScenario3;
         }
 
@@ -106,15 +112,6 @@ public class PrepareScenarioEnvironment {
         }
 
 //        1.6 创建测试记录 record table1
-        boolean recordTable1Exist = checkTableIsExist(conn,recordTable1,dbType,owner);
-        if(recordTable1Exist){
-            try(Statement stmtTruncate = conn.createStatement()){
-                stmtTruncate.execute("TRUNCATE TABLE "+ recordTable1);
-                logger.info("[场景3] 清空 "+ recordTable1 + " 表成功");
-            }
-        }
-
-
         String createRecordSql = "";
         if (dbType.equalsIgnoreCase("Oracle")) {
             createRecordSql = "CREATE TABLE " + recordTable1 + "(\n" +
