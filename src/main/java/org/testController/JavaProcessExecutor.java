@@ -120,7 +120,7 @@ public class JavaProcessExecutor {
     }
 
 
-    public static void main(String[] args) {
+/*    public static void main(String[] args) {
 
 //        String logFile = "insert_log_" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".log";
 
@@ -129,5 +129,5 @@ public class JavaProcessExecutor {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
+    }*/
 }

@@ -244,6 +244,9 @@ public class SceneExecutor {
         logger.info("[场景3] 更新 config.properties 文件成功");
 
 //       1：预处理逻辑
+        PrepareScenarioEnvironment.prepareScenario3Environment(conn,dbType,recordTable1);
+
+ /*
 //        1.1 固定选择 tb_usernum_list1
         String selectedTable = "TB_USERNUM_LIST1";
         String owner = DbManager.getProperty(dbType + ".user");
@@ -354,7 +357,7 @@ public class SceneExecutor {
         } finally {
             if (stmt != null) stmt.close();
         }
-
+*/
         logger.info("数据库初始化完成，即将启动并发读测试...");
 
 //        2. 启动性能监控
@@ -423,7 +426,7 @@ public class SceneExecutor {
      *
      * @throws IOException
      */
-    public void runScenario5() throws IOException {
+    public void runScenario5() throws IOException, SQLException {
         logger.info("[场景5] 开始执行：并发执行场景3和场景4");
         String Scenario5 = "Scenario5";
 

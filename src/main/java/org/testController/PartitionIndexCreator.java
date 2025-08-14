@@ -32,7 +32,8 @@ public class PartitionIndexCreator {
             String indexName = indexNames.get(i);
             String block = buildAnonymousBlock(tableName, columnName, indexName);
 
-            logger.info("开始创建分区索引: {} on {}({})", indexName, tableName, columnName);
+            logger.info("开始创建分区索引: {} ", indexName);
+
             long start = System.currentTimeMillis();
             try (Statement stmt = conn.createStatement()) {
                 stmt.execute(block);
