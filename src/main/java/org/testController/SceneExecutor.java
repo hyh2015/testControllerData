@@ -373,6 +373,10 @@ public class SceneExecutor {
         JavaProcessExecutor.executeJavaProcess(tableMigJar, configProperties, timeHour, logFile);
 
         MonitorIOUtils.stopMonitoring(monitors);
+
+//        获取部分指标信息
+        RecordTableSelector.recordTableSqlList(conn,recordTable1,"record1");
+
     }
 
 
@@ -499,8 +503,11 @@ public class SceneExecutor {
         destroyIfAlive(dstat);*/
         logger.info("[场景5] 停止性能监控进程完成");
 
-//       6. 打印总耗时
-        logger.info("[场景5] 总耗时：" + (end - start) / 1000 + " 秒");
+//        6.获取部分指标信息
+        RecordTableSelector.recordTableSqlList(conn,recordTable2,"record2");
+
+        conn.close();
+
 
         logger.info("[场景5] 场景3和场景4均已执行完毕，场景5结束");
     }
