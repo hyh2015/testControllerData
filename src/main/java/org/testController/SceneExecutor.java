@@ -44,8 +44,8 @@ public class SceneExecutor {
 
     private final String mockdataJar = "mockdata.jar";
 
-    static String directoryPath = DbManager.getProperty("data.path");
-    static int fileNum = Integer.parseInt(DbManager.getProperty("data.file.num"));
+    static String dirPath = DbManager.getProperty("data.path");
+    static int checkFileNum = Integer.parseInt(DbManager.getProperty("mockdata.file.num"));
 
     public SceneExecutor(String dbType) {
         this.dbType = dbType;
@@ -62,19 +62,12 @@ public class SceneExecutor {
         this.dbUser = DbManager.getProperty(dbType + ".user");
         this.dbPassword = DbManager.getProperty(dbType + ".password");
         this.insertTableEvt = DbManager.getProperty("insert.tablename");
-/*        this.recordTable1 = "tb_test_record_sql1";
-        this.recordTable2 = "tb_test_record_sql2";
-        this.tableMigJar = "tableMigration.jar";
-        this.insertIntoJar = "InsertIntoOracle.jar";
-        this.configProperties = "config.properties";
-        this.l2oProperties = "l2o.properties";
-        this.mockdataJar = "mockdata.jar";*/
     }
 
     public void generateMockTestData() throws Exception {
         logger.info("[预处理] 生成测试数据...");
         Mockdata.generateMockTestData(mockdataJar, dataPath);
-        if (Mockdata.runMockScript() && Mockdata.waitForValidFiles(fileNum, directoryPath)) {
+        if (Mockdata.runMockScript() && Mockdata.waitForValidFiles(checkFileNum, dirPath)) {
             System.out.println("测试数据生成成功");
         } else {
             System.err.println("测试数据生成失败");
@@ -143,10 +136,10 @@ public class SceneExecutor {
         indexFields.add("imsi");
         indexFields.add("lai,ci");
         List<String> indexNames = new ArrayList<>();
-        indexNames.add(DbManager.getProperty("index.name.1"));
-        indexNames.add(DbManager.getProperty("index.name.2"));
-        indexNames.add(DbManager.getProperty("index.name.3"));
-        indexNames.add(DbManager.getProperty("index.name.4"));
+        indexNames.add(DbManager.getProperty("index.name.1") + partTableName);
+        indexNames.add(DbManager.getProperty("index.name.2") + partTableName);
+        indexNames.add(DbManager.getProperty("index.name.3") + partTableName);
+        indexNames.add(DbManager.getProperty("index.name.4") + partTableName);
 
         try {
             if (dbType.equalsIgnoreCase("pgdb")
@@ -375,7 +368,7 @@ public class SceneExecutor {
         MonitorIOUtils.stopMonitoring(monitors);
 
 //        获取部分指标信息
-        RecordTableSelector.recordTableSqlList(conn,recordTable1,"record1");
+        RecordTableSelector.recordTableSqlList(conn,recordTable1);
 
     }
 
@@ -504,7 +497,7 @@ public class SceneExecutor {
         logger.info("[场景5] 停止性能监控进程完成");
 
 //        6.获取部分指标信息
-        RecordTableSelector.recordTableSqlList(conn,recordTable2,"record2");
+        RecordTableSelector.recordTableSqlList(conn,recordTable2);
 
         conn.close();
 
@@ -512,87 +505,6 @@ public class SceneExecutor {
         logger.info("[场景5] 场景3和场景4均已执行完毕，场景5结束");
     }
 
-
-    //    准备环境
-    public static void prepareScenario4Environment(Connection conn) throws Exception {
-
-        String tableName = DbManager.getProperty("insert.tablename");
-        String indexName = DbManager.getProperty("insert.indexname");
-
-//         1. 创建入库表 tb_evt_i
-        String createTableSQL = "CREATE TABLE IF NOT EXISTS " + tableName + " (" +
-                "begintime timestamp," +
-                "usernum text," +
-                "imei text," +
-                "calltype text," +
-                "netid text," +
-                "lai text," +
-                "ci text," +
-                "imsi text," +
-                "start_time text," +
-                "end_time text," +
-                "longitude text," +
-                "latitude text," +
-                "lacci text," +
-                "timespan text," +
-                "extra_longitude text," +
-                "extra_latitude text," +
-                "geospan text," +
-                "anchorhash text," +
-                "extra_geohash text," +
-                "bd text," +
-                "ad text," +
-                "user_id text," +
-                "address text," +
-                "car_id text," +
-                "mac text," +
-                "mobile_mode text," +
-                "usernum1 text," +
-                "area text," +
-                "ipv4 text," +
-                "ipv6 text," +
-                "mission_id text," +
-                "bankcard_id text" +
-                ")";
-
-        Statement stmt = conn.createStatement();
-        stmt.execute(createTableSQL);
-        logger.info("[场景4] 创建入库表 " + tableName + " 成功");
-
-//         2. 创建本地索引
-        String createIndexSQL = "CREATE INDEX IF NOT EXISTS " + indexName + " ON " + tableName + " USING BTREE(usernum)";
-        stmt.execute(createIndexSQL);
-        logger.info("[场景4] 创建本地索引 " + indexName + " 成功");
-
-        stmt.close();
-    }
-
-    public static void prepareScenario5Environment(Connection connect, String insertTableEvt) {
-
-//         1. 清空tb_evt_i表
-        try (Statement stmtTruncate = connect.createStatement()) {
-            stmtTruncate.execute("TRUNCATE TABLE " + insertTableEvt);
-            logger.info("[场景5] 清空 " + insertTableEvt + " 表成功");
-
-            connect.close();
-        } catch (SQLException e) {
-            logger.error("[场景5] 清空表：" + insertTableEvt + "失败");
-        }
-
-//         2. 修改 l2o.properties，设置 file.num = 150,thread.num = 10,bulkload = false
-        String fileNum = DbManager.getProperty("binfaInsert.file.num");
-        String threadNum = DbManager.getProperty("insert.thread.num");
-        UpdateConfProperties.updateConcurrentInsertConfig(insertTableEvt, fileNum, threadNum, false);
-        logger.info("[场景5] 更新 l2o.properties 文件成功.");
-
-    }
-
-    private static void destroyIfAlive(Process process) {
-        if (process != null && process.isAlive()) {
-            process.destroy();
-            logger.info("已终止 " + process + " 进程");
-        }
-    }
 
     public String getDbDriverClass() {
         return dbDriverClass;

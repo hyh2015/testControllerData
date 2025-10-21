@@ -15,7 +15,7 @@ public class RecordTableSelector {
 
     private static final Logger logger = LoggerFactory.getLogger(RecordTableSelector.class);
 
-    public static Map<String, Double> recordTableSqlList(Connection conn, String tableName, String prefix) throws SQLException {
+    public static void recordTableSqlList(Connection conn, String tableName) throws SQLException {
 
         Map<String, Double> map = new LinkedHashMap<>();
 
@@ -37,35 +37,29 @@ public class RecordTableSelector {
 
 //        1.avgreturn/sec
         Double avgreturn = queryForDouble(conn, avgreturn_secSql);
-        map.put(prefix + "_avgreturn_per_sec", avgreturn);
         logger.info("获取到的指标数据 avgreturn/sec：" + avgreturn);
 
 //        2. avgfinish/sec
         Double avgfinish = queryForDouble(conn, avgfinish_secSql);
-        map.put(prefix + "_avgfinish_per_sec", avgfinish);
         logger.info("获取到的指标数据 avgfinish/sec：" + avgfinish);
 
 //        3.maxfinish/sec
         Double maxfinish = queryForDouble(conn, maxfinish_secSql);
-        map.put(prefix + "_maxfinish_per_sec", maxfinish);
         logger.info("获取到的指标数据 maxfinish/sec：" + maxfinish);
 
 //        4.100r/sec
         Double roud100 = queryForDouble(conn, roud100_secSql);
-        map.put(prefix + "_100r_per_sec", roud100);
         logger.info("获取到的指标数据 100r/sec：" + roud100);
 
 //        5.stddev/avg
         Double stddev = queryForDouble(conn, stddev_avgSql);
-        map.put(prefix + "_stddev_avg", stddev);
         logger.info("获取到的指标数据 stddev/avg：" + stddev);
 
-        return map;
 
     }
 
     private static Double queryForDouble(Connection conn, String sql) throws SQLException {
-        logger.info("指标获取SQL：" + sql);
+//        logger.info("指标获取SQL：" + sql);
         try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
             if (rs.next()) {
                 return rs.getDouble(1);

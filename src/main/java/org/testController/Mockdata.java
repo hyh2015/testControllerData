@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class Mockdata {
@@ -41,110 +42,50 @@ public class Mockdata {
     // 校验生成测试文件是否成功
     public static boolean waitForValidFiles(int fileNum, String dirPath) {
 
-        // 每次重试间隔（毫秒）
+        // 每次重试间隔30s,文件执行超过时间 6h
         final int CHECK_INTERVAL_S = 30 * 1000; // 30秒
-        String cmd = String.format("expected=%d; \n" +
-                        "count=$(find %s -type f | wc -l); \n" +
-                        "valid=$(find %s -type f -size +4100M | wc -l); \n" +
-                        "[ \"$count\" -eq \"$expected\" ] && [ \"$valid\" -eq \"$expected\" ] && echo OK || echo NOT_OK\n",
+        final int timeOut = 6 * 3600;
+        long countTimes = 0;
+        String cmd = String.format("filecount=%d;count=$(find %s -type f |wc -l);" +
+                        " valid=$(find %s -type f -size +4050M |wc -l); " +
+                        "[ \"$count\" -eq \"$filecount\" ] && [ \"$valid\" -eq \"$filecount\" ] && echo OK || echo NOT_OK",
                 fileNum, dirPath, dirPath
         );
 
         System.out.println("开始校验目录：" + dirPath);
 
-        while (true) {
-            try {
-                ProcessBuilder pb = new ProcessBuilder("bash", "-c", cmd);
-                pb.redirectErrorStream(true);
-                Process process = pb.start();
+        if (countTimes > timeOut) {
+            logger.error("生产文件超时，程序退出！！！");
+            return false;
+        } else {
+            while (true) {
+                try {
+                    ProcessBuilder pb = new ProcessBuilder("bash", "-c", cmd);
+                    pb.redirectErrorStream(true);
+                    Process process = pb.start();
 
-                BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(process.getInputStream()));
-                String result = reader.readLine();
-                process.waitFor();
+                    BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(process.getInputStream()));
+                    String result = reader.readLine();
+                    process.waitFor();
 
-                if ("OK".equals(result)) {
-                    logger.info("校验通过，完成测试数据文件的生成");
-                    return true;
-                } else {
-//                    logger.info("校验未通过，等待 " + (CHECK_INTERVAL_MS / 1000) + " 秒后重试...");
-                    Thread.sleep(CHECK_INTERVAL_S);
+                    if ("OK".equals(result)) {
+                        logger.info("校验通过，完成测试数据文件的生成");
+                        return true;
+                    } else if ("NOT_OK".equalsIgnoreCase(result)) {
+                        Thread.sleep(CHECK_INTERVAL_S);
+                    }
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return false;
                 }
-
-            } catch (Exception e) {
-                e.printStackTrace();
-                return false;
             }
         }
-
     }
 
-   /* // 调用mockdata.jar生成数据
-    public static void generateMockTestData(String mockdataJar, String dataPath) throws Exception {
-        LocalDate startDate = LocalDate.parse(DbManager.getProperty("mockdata.start_date"));
-        int monthCount = Integer.parseInt(DbManager.getProperty("mockdata.months"));
 
-        // 检查参数是否为空
-        if (mockdataJar == null || mockdataJar.trim().isEmpty()) {
-            throw new IllegalArgumentException("mockdataJarPath 不能为空");
-        }
-
-        if (dataPath == null || dataPath.trim().isEmpty()) {
-            throw new IllegalArgumentException("dataPath 不能为空");
-        }
-
-        // 打印当前工作目录，帮助调试
-        System.out.println("当前工作目录: " + new File(".").getAbsolutePath());
-
-        for (int i = 0; i < monthCount; i++) {
-            LocalDate current = startDate.plusMonths(i);
-            int days = current.lengthOfMonth();
-            String dateStr = current.toString();
-
-            // 构造命令
-            List<String> command = new ArrayList<>();
-            command.add("java");
-            command.add("-jar");
-            command.add(mockdataJar);
-            command.add("-T" + dateStr);
-            command.add("-D" + dataPath);
-            command.add("-N" + days);
-
-            System.out.println("执行命令：" + String.join(" ", command));
-
-*//*            try {
-                ProcessBuilder processBuilder = new ProcessBuilder(command);
-                processBuilder.redirectErrorStream(true); // 合并标准错误输出和标准输出
-
-                Process process = processBuilder.start();
-
-                // 读取子进程的输出
-                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    System.out.println("[mockdata] " + line);
-                }
-
-                int exitCode = process.waitFor();
-                if (exitCode != 0) {
-                    System.err.println("mockdata.jar 执行失败，退出码：" + exitCode);
-                } else {
-                    System.out.println("mockdata.jar 执行成功");
-                }
-
-            } catch (Exception e) {
-                System.err.println("启动 mockdata.jar 失败: " + e.getMessage());
-                e.printStackTrace();
-            }
-
-            Thread.sleep(1000); // 间隔 1 秒*//*
-        }
-
-        System.out.println("测试数据预处理生成完成");
-    }*/
-
-
-    // 生成shell脚本：mock.sh文件 其中包含执行mockdata.jar程序
+    // 生成shell脚本：mock.sh文件 并赋权限 执行
     public static void generateMockTestData(String mockdataJar, String dataPath) throws Exception {
         LocalDate startDate = LocalDate.parse(DbManager.getProperty("mockdata.start_date"));
         int monthCount = Integer.parseInt(DbManager.getProperty("mockdata.months"));
@@ -157,7 +98,10 @@ public class Mockdata {
             throw new IllegalArgumentException("dataPath 不能为空");
         }
 
-        File scriptFile = new File("mock.sh");
+        // 打印当前工作目录 帮助调试
+        logger.info("当前工作目录："+new File(".").getAbsolutePath());
+
+        File scriptFile = new File(mockStr);
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(scriptFile))) {
 
             writer.write("#!/bin/bash\n\n");
@@ -167,20 +111,33 @@ public class Mockdata {
                 int days = current.lengthOfMonth();
                 String dateStr = current.toString();
 
-                List<String> command = new ArrayList<>();
-                command.add("java");
-                command.add("-jar");
-                command.add(mockdataJar);
-                command.add("-T" + dateStr);
-                command.add("-D" + dataPath);
-                command.add("-N" + days);
+                List<String> command = Arrays.asList("java","-jar",mockdataJar,
+                        " -T"+ dateStr,
+                        " -D"+ dataPath,
+                        " -N"+days,
+                        " &");
+
+                logger.info("准备写入命令：" + String.join(" ",command));
 
                 writer.write(String.join(" ", command));
                 writer.write("\n");
             }
 
-            logger.info("mock.sh 脚本生成成功: " + scriptFile.getAbsolutePath());
+        } catch (IOException e){
+            logger.error("写入可执行文件：" + mockStr + "失败");
+            e.printStackTrace();
         }
+        logger.info("mock.sh 脚本生成成功: " + scriptFile.getAbsolutePath());
+
+        // 赋权限给脚本本身
+        try{
+            new ProcessBuilder("chmod","+x", mockStr).start().waitFor();
+        }catch (InterruptedException e){
+            e.printStackTrace();
+        }catch (IOException e){
+            e.printStackTrace();
+        }
+
     }
 
 }

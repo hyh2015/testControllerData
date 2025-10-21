@@ -12,7 +12,6 @@ import java.io.InputStream;
 
 public class DbManager {
 
-    private static final Logger logger = LoggerFactory.getLogger(DbManager.class);
     private static final Properties props = new Properties();
 
     static {

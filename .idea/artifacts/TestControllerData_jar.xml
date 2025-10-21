@@ -1,0 +1,30 @@
+<component name="ArtifactManager">
+  <artifact name="TestControllerData:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/TestControllerData_jar</output-path>
+    <root id="root">
+      <element id="archive" name="TestControllerData.jar">
+        <element id="module-output" name="TestControllerData" />
+      </element>
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/mockdata.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/h2_driver.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/guava-22.0.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/druid-1.1.10.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/commons-io-2.4.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/DBBenchPerfTest.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/disruptor-3.3.4.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/InsertIntoOracle.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/log4j-api-2.11.0.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/slf4j-api-1.7.10.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/log4j-core-2.11.0.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/ojdbc7-12.1.0.2.0.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/postgresql-42.7.5.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/commons-lang3-3.3.2.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/hgjdbc-6.2.4.build11.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/log4j-1.2-api-2.11.0.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/log4j-slf4j-impl-2.11.0.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/mysql-connector-java-5.1.45.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/VastbaseG100_jdbc_2.9p_2023120616.jar" />
+      <element id="file-copy" path="$PROJECT_DIR$/../libDBB/gbasedbtjdbc_3.6.5_NR_P20250826_86e700.jar" />
+    </root>
+  </artifact>
+</component>

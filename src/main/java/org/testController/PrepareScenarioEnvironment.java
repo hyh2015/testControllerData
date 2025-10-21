@@ -39,7 +39,6 @@ public class PrepareScenarioEnvironment {
                     }
                 }
             }
-
         }
 
         return tableExists;
@@ -65,8 +64,9 @@ public class PrepareScenarioEnvironment {
 
 
 //        2 根据数据库类型选择验证语句
-        boolean tableExists = checkTableIsExist(conn, selectedTable, dbType, owner);
-        if (!tableExists) {
+        boolean selectedTableExists = checkTableIsExist(conn, selectedTable, dbType, owner);
+        boolean renamedTableExists = checkTableIsExist(conn, renamedTable, dbType, owner);
+        if (!selectedTableExists) {
             logger.warn("未找到 " + selectedTable + " 表，查看是否存在 " + renamedTable + "表已rename操作");
             if (!checkTableIsExist(conn, renamedTable, dbType, owner)) {
                 throw new RuntimeException("未找到 " + renamedTable + " 表，无法继续执行场景3");
@@ -76,10 +76,16 @@ public class PrepareScenarioEnvironment {
             // 非第一次执行场景3 只需要清空record table1
             try(Statement stmtTruncate = conn.createStatement()){
                 stmtTruncate.execute("TRUNCATE TABLE "+ recordTable1);
-                logger.info("[场景3] 清空 "+ recordTable1 + " 表成功");
+                logger.info("清空 "+ recordTable1 + " 表成功");
             }
 
             return prepareScenario3;
+
+        } else if (renamedTableExists) {
+            try(Statement stmtTruncate = conn.createStatement()){
+                stmtTruncate.execute("DROP TABLE "+ renamedTable);
+                logger.info("清空 "+ renamedTable + " 表成功");
+            }
         }
 
 
@@ -153,7 +159,7 @@ public class PrepareScenarioEnvironment {
     public static void prepareScenario4Environment(Connection conn, String dbType) throws SQLException {
 
         String tableName = DbManager.getProperty("insert.tablename");
-        String indexName = DbManager.getProperty("insert.indexname");
+        String indexName = DbManager.getProperty("insert.indexname") + tableName;
 
         String createTableSQL = "";
 
