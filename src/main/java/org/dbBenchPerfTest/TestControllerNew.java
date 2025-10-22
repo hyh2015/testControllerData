@@ -34,8 +34,15 @@ public class TestControllerNew {
         if (DbManager.isEnabled("scene4.enabled")) {
             new Scenario4(config).run(db);
         }
-        if (DbManager.isEnabled("iscene5.enabled")) {
+        if (DbManager.isEnabled("scene5.enabled")) {
             new Scenario5(config).run(db);
+        }
+        if (DbManager.isEnabled("GBbase8s.read.enabled")){
+            new GBaseRandomReadSecnario(config).run(db);
+        }
+        if (DbManager.isEnabled("GBbase8s.readAndinsert.enabled")){
+            new GBaseReadAndInsertSecnario(config).run(db);
         }
     }
 }
+

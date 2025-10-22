@@ -27,6 +27,7 @@ public class HighgoDatabase implements DatabaseInface  {
     private static final Logger logger = LoggerFactory.getLogger(HighgoDatabase.class);
 
     private final TestConfig config;
+    private final String dataType = "HIGHGO";
 
     public HighgoDatabase(TestConfig config) {
         this.config = config;
@@ -34,7 +35,7 @@ public class HighgoDatabase implements DatabaseInface  {
 
     @Override
     public void createPartitionTable() {
-        logger.info("[预处理] Highgo数据库开始创建分区表...");
+        logger.info("[预处理] "+dataType+" 数据库开始创建分区表...");
 
         String partTableName = config.getPartTableName();
 
@@ -60,24 +61,24 @@ public class HighgoDatabase implements DatabaseInface  {
         }
         partitionSql.setLength(partitionSql.length() - 1);
         partitionSql.append(")");
-        logger.info("Highgo 数据库开始执行创建分区表："+partTableName);
+        logger.info(dataType+" 数据库开始执行创建分区表："+partTableName);
         try(Connection connec = DbManager.getConnection(config.getDbType());
             Statement stmt = connec.createStatement()) {
             stmt.execute(partitionSql.toString());
         } catch (SQLException e) {
-            logger.error("Highgo 数据库创建分区表失败");
+            logger.error(dataType+" 数据库创建分区表失败");
             throw new RuntimeException(e);
         }
-        logger.info("Highgo数据库创建分区表："+partTableName+"成功");
+        logger.info(dataType+" 数据库创建分区表："+partTableName+"成功");
     }
 
     /**
-     *  highgo数据库下进行场景1测试：批量入库 + 创建4个分区索引
+     *  数据库进行场景1测试：批量入库 + 创建4个分区索引
      */
     @Override
     public void copyData()  {
 
-        logger.info("Highgo数据库 批量入库...执行 COPY STDIN ");
+        logger.info(dataType+" 数据库 批量入库...执行 COPY STDIN ");
 
         String insertIntoJar = config.getInsertIntoJar();
         String l2oProperties = config.getL2oProperties();
@@ -111,7 +112,8 @@ public class HighgoDatabase implements DatabaseInface  {
         indexNames.add(DbManager.getProperty("index.name.3") + partTableName);
         indexNames.add(DbManager.getProperty("index.name.4") + partTableName);
 
-        PartitionIndexCreator.createPartitionIndexesHighgoVastbaseOracle(config.getConn(), partTableName, indexFields, indexNames, config.getDbType());
+        PartitionIndexCreator.createPartitionIndexesHgVb(config.getConn(), partTableName, indexFields, indexNames, config.getDbType());
     }
 
 }
+

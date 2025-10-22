@@ -30,22 +30,24 @@ public class SceneExecutor {
     private final String dbURL;
     private final String dbUser;
     private final String dbPassword;
-    private final String insertTableEvt;
 
     // ivory/pg不支持sysdate函数 。所以默认record表1和表2。表名不能改变。表1记录场景3，表2记录场景5.
-    private final String recordTable1 = "tb_test_record_sql1";
-    private final String recordTable2 = "tb_test_record_sql2";
+    private final String recordTable1= "tb_test_record_sql1";
+    private final String recordTable2= "tb_test_record_sql2";
 
-    private final String tableMigJar = "tableMigration.jar";
-    private final String insertIntoJar = "InsertIntoOracle.jar";
+    private final String insertTableEvt;
+
+    private final String tableMigJar= "tableMigration.jar";
+    private final String insertIntoJar="InsertIntoOracle.jar";
+    private final String mockdataJar = "mockdata.jar";
 
     private final String configProperties = "config.properties";
     private final String l2oProperties = "l2o.properties";
 
-    private final String mockdataJar = "mockdata.jar";
+    static final String dirPath = DbManager.getProperty("data.path");
+    static final int checkFileNum = Integer.parseInt(DbManager.getProperty("mockdata.file.num"));
 
-    static String dirPath = DbManager.getProperty("data.path");
-    static int checkFileNum = Integer.parseInt(DbManager.getProperty("mockdata.file.num"));
+    static final int fileSizeMb = 4102;
 
     public SceneExecutor(String dbType) {
         this.dbType = dbType;
@@ -64,13 +66,13 @@ public class SceneExecutor {
         this.insertTableEvt = DbManager.getProperty("insert.tablename");
     }
 
-    public void generateMockTestData() throws Exception {
+    public void generateMockTestData() {
         logger.info("[预处理] 生成测试数据...");
         Mockdata.generateMockTestData(mockdataJar, dataPath);
-        if (Mockdata.runMockScript() && Mockdata.waitForValidFiles(checkFileNum, dirPath)) {
-            System.out.println("测试数据生成成功");
+        if (Mockdata.runMockScript() && Mockdata.waitForVaildFiles(checkFileNum, dirPath)) {
+            logger.info("测试数据生成成功");
         } else {
-            System.err.println("测试数据生成失败");
+            logger.error("测试数据生成失败");
         }
     }
 
@@ -91,20 +93,21 @@ public class SceneExecutor {
         String copyFileNum = DbManager.getProperty("copy.file.num");
         String copyThreadNum = DbManager.getProperty("copy.thread.num");
 
-//        1. 修改 l2o.properties，设置 file.num = 365,thread.num = 4,bulkload = true
+//        1.修改 l2o.properties，设置 file.num = 365,thread.num = 4,bulkload = true
         UpdateConfProperties.updateConcurrentInsertConfig(partTableName, copyFileNum, copyThreadNum, true);
         logger.info("[场景1] 更新 l2o.properties 文件成功.");
 
-//        2. 调用执行iostat dstat监控
         String monitorInterval600 = DbManager.getProperty("monitorInterval.600");
         logger.info("[场景1] 启动 iostat / dstat 监控，间隔: " + monitorInterval600);
-        MonitorIOUtils.MonitorProcesses monitors = MonitorIOUtils.startIOstatDstatOutput(Scenario1, monitorInterval600, "copy");
 
-//         3. 批量入库执行
+//        调用执行 iostat dstat 监控
+        MonitorIOUtils.MonitorProcesses monitors = MonitorIOUtils.startIOstatDstatOutput(Scenario1,monitorInterval600,"copy");
+
         logger.info("[场景1] 开始执行批量入库程序...");
         try {
             long loadStart = System.currentTimeMillis();
-            String logFile = Scenario1 + "_copy_" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".log";
+//          2. 批量入库执行
+            String logFile = Scenario1 + "_copy_out_" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".log";
             JavaProcessExecutor.executeJavaProcess(insertIntoJar, l2oProperties, 0, logFile);
             long loadEnd = System.currentTimeMillis();
             logger.info("[场景1] 批量入库耗时: " + ((loadEnd - loadStart) / 1000) + " 秒");
@@ -116,20 +119,11 @@ public class SceneExecutor {
             MonitorIOUtils.stopMonitoring(monitors);
         }
 
-//        4. 启动创建索引的IOSTAT DSTAT
         logger.info("[场景1] 启动创建索引阶段性能监控 iostat 和 dstat...");
-        MonitorIOUtils.MonitorProcesses monitorCreateIdx = MonitorIOUtils.startIOstatDstatOutput(Scenario1, monitorInterval600, "createIndex");
+        MonitorIOUtils.MonitorProcesses monitorsCreateIdx = MonitorIOUtils.startIOstatDstatOutput(Scenario1,monitorInterval600,"createIndex");
 
-/*        Process iostatIndex = new ProcessBuilder("iostat", "-xm", monitorInterval)
-                .redirectOutput(new File(Scenario1+"_createIndex_iostat" + monitorInterval + ".log"))
-                .redirectErrorStream(true)
-                .start();
-        Process dstatIndex = new ProcessBuilder("dstat", monitorInterval)
-                .redirectOutput(new File(Scenario1+"_createIndex_dstat" + monitorInterval + ".log"))
-                .redirectErrorStream(true)
-                .start();*/
 
-        logger.info("[场景1] 开始创建索引...");
+//        分别创建四个索引
         List<String> indexFields = new ArrayList<>();
         indexFields.add("usernum");
         indexFields.add("imei");
@@ -141,29 +135,18 @@ public class SceneExecutor {
         indexNames.add(DbManager.getProperty("index.name.3") + partTableName);
         indexNames.add(DbManager.getProperty("index.name.4") + partTableName);
 
-        try {
-            if (dbType.equalsIgnoreCase("pgdb")
-                    || dbType.equalsIgnoreCase("ivory")) {
-                PartitionIndexCreator.createPartitionIndexesPgIvory(conn, partTableName, indexFields, indexNames);
-            } else if (dbType.equalsIgnoreCase("highgo")
-                    || dbType.equalsIgnoreCase("vastdata")) {
-/*                try (Statement stmt = conn.createStatement()) {
-                    createIndex(stmt, DbManager.getProperty("index.name.1"), partTableName, "usernum");
-                    createIndex(stmt, DbManager.getProperty("index.name.2"), partTableName, "imei");
-                    createIndex(stmt, DbManager.getProperty("index.name.3"), partTableName, "imsi");
-                    createIndex(stmt, DbManager.getProperty("index.name.4"), partTableName, "lai,ci");
-                }*/
-                PartitionIndexCreator.createPartitionIndexesHighgoVastbaseOracle(conn, partTableName, indexFields, indexNames, dbType);
-            }
-        } catch (Exception e) {
-            logger.error("[场景1] 创建索引失败", e);
-            throw e;
-        } finally {
-            // 杀掉 iostat 和 dstat（若仍在运行）
-            MonitorIOUtils.stopMonitoring(monitorCreateIdx);
+        if (dbType.equalsIgnoreCase("pgdb") || dbType.equalsIgnoreCase("ivory")) {
+            PartitionIndexCreator.createPartitionIndexesPgIvory(conn, partTableName, indexFields, indexNames);
+        } else if (dbType.equalsIgnoreCase("highgo") || dbType.equalsIgnoreCase("vastdata")
+                || dbType.equalsIgnoreCase("Oracle")) {
+            PartitionIndexCreator.createPartitionIndexesHgVb(conn, partTableName, indexFields, indexNames, dbType);
         }
 
+        // 杀掉 iostat 和 dstat（若仍在运行）
+        MonitorIOUtils.stopMonitoring(monitorsCreateIdx);
+
     }
+
 
     /**
      * 场景2：distinct计算
@@ -175,7 +158,7 @@ public class SceneExecutor {
 
         String baseUsernumTable = "tb_usernum_list";
         String sourceTable = partTableName; // 假设是 tb_part_2025
-        String[] dates = {"2025-01-25", "2025-02-25", "2025-03-25"};
+        String[] dates = {"2025-01-01", "2025-02-01", "2025-04-01"};
 
         try (Statement stmt = conn.createStatement()) {
             for (int i = 0; i < dates.length; i++) {
@@ -201,20 +184,18 @@ public class SceneExecutor {
                             targetTable, sourceTable, startDate, endDate
                     );
                 }
-
                 logger.info("[场景2] 开始执行SQL，创建表：" + targetTable);
                 logger.info("[场景2] 执行SQL：" + sql);
                 long startTime = System.currentTimeMillis();
-
                 stmt.execute(sql);
-
                 long endTime = System.currentTimeMillis();
 
                 ResultSet rs = stmt.executeQuery("select count(*) from " + targetTable);
                 if (rs.next()) {
                     int count = rs.getInt(1);
-                    logger.info("[场景2] 表" + targetTable + " 共插入 " + count + " 条数据");
+                    logger.info("[场景2] 表" + targetTable + " 共插入 " + count + " 条记录");
                 }
+
                 logger.info("[场景2] 创建表 " + targetTable + " 完成，耗时 " + ((endTime - startTime) / 1000.0) + " 秒");
             }
         }
@@ -222,7 +203,6 @@ public class SceneExecutor {
 
     /**
      * 场景3：并发随机读（默认100个并发）默认指定查询时间3h
-     *
      */
     public void runScenario3() throws Exception {
 
@@ -237,150 +217,153 @@ public class SceneExecutor {
         logger.info("[场景3] 更新 config.properties 文件成功");
 
 //       1：预处理逻辑
-        PrepareScenarioEnvironment.prepareScenario3Environment(conn,dbType,recordTable1);
+        PrepareSecnarioEnvironment.prepareScenario3Environment(conn, dbType, recordTable1);
 
- /*
-//        1.1 固定选择 tb_usernum_list1
-        String selectedTable = "TB_USERNUM_LIST1";
-        String owner = DbManager.getProperty(dbType + ".user");
+        /**
+         //        1.1 固定选择 tb_usernum_list1
 
-//        2.1 根据数据库类型选择验证语句
-        String checkSql;
-        if ("pgdb".equalsIgnoreCase(dbType) || "ivory".equalsIgnoreCase(dbType)) {
-            checkSql = "SELECT to_regclass('" + selectedTable + "')";
-        } else if ("vastdata".equalsIgnoreCase(dbType)) {
-            checkSql = "SELECT * from pg_catalog.all_tables where owner=upper('" + owner + "') and table_name=upper('" + selectedTable + "')";
-        } else if ("highgo".equalsIgnoreCase(dbType)) {
-            checkSql = "SELECT * from pg_catalog.pg_tables where owner=lower('" + owner + "') and table_name=lower('" + selectedTable + "')";
-        } else if ("Oracle".equalsIgnoreCase(dbType)) {
-            checkSql = "SELECT * from dba_tables where owner=upper('" + owner + "') and table_name=upper('" + selectedTable + "')";
-        } else {
-            throw new IllegalArgumentException("不支持的数据库类型: " + dbType);
-        }
+         String selectedTable = "TB_USERNUM_LIST1";
+         String owner = DbManager.getProperty(dbType + ".user");
 
-        boolean tableExists = false;
-        Statement stmt = null;
-        ResultSet rs = null;
-        try {
-            stmt = conn.createStatement();
-            rs = stmt.executeQuery(checkSql);
-            if (rs.next()) {
-                if ("pgdb".equalsIgnoreCase(dbType) || "ivory".equalsIgnoreCase(dbType)) {
-                    tableExists = rs.getString(1) != null;
-                } else {
-                    tableExists = true; // 有结果表示存在
-                }
-            }
-        } finally {
-            if (rs != null) rs.close();
-            if (stmt != null) stmt.close();
-        }
+         //        1.2 根据数据库类型选择验证语句
+         String checkSql;
+         if ("pgdb".equalsIgnoreCase(dbType) || "ivory".equalsIgnoreCase(dbType)) {
+         checkSql = "SELECT to_regclass('" + selectedTable + "')";
+         } else if ("vastdata".equalsIgnoreCase(dbType)) {
+         checkSql = "SELECT * from pg_catalog.all_tables where owner=upper('" + owner + "') and table_name=upper('" + selectedTable + "')";
+         } else if ("highgo".equalsIgnoreCase(dbType)) {
+         checkSql = "select * from pg_catalog.pg_tables pt where tableowner=lower('" + owner + "') and tablename=lower('" + selectedTable + "')";
+         } else if ("Oracle".equalsIgnoreCase(dbType)){
+         checkSql = "SELECT * from dba_tables where owner=upper('" + owner + "') and table_name=upper('" + selectedTable + "')";
+         } else {
+         throw new IllegalArgumentException("不支持的数据库类型: " + dbType);
+         }
 
-        if (!tableExists) {
-            throw new RuntimeException("未找到 tb_usernum_list1 表，无法继续执行场景3");
-        }
+         boolean tableExists = false;
+         Statement stmt = null;
+         ResultSet rs = null;
+         try {
+         stmt = conn.createStatement();
+         rs = stmt.executeQuery(checkSql);
+         if (rs.next()) {
+         if ("pgdb".equalsIgnoreCase(dbType) || "ivory".equalsIgnoreCase(dbType)) {
+         tableExists = rs.getString(1) != null;
+         } else {
+         tableExists = true; // 有结果表示存在
+         }
+         }
+         } finally {
+         if (rs != null) rs.close();
+         if (stmt != null) stmt.close();
+         }
 
-//        1.3 将选中的表重命名为 tb_usernum_list
-        String renameSql = "ALTER TABLE " + selectedTable + " RENAME TO tb_usernum_list";
-        stmt = null;
-        try {
-            stmt = conn.createStatement();
-            stmt.execute(renameSql);
-            logger.info("[场景3] 成功将号码池表 " + selectedTable + " 重命名为 tb_usernum_list");
-        } finally {
-            if (stmt != null) stmt.close();
-        }
+         if (!tableExists) {
+         logger.warn("未找到 tb_usernum_list1 表，查看是否存在 tb_usernum_list 表已rename操作");
+         //            throw new RuntimeException("未找到 tb_usernum_list1 表，无法继续执行场景3");
 
-//        1.4 创建 tb_table_list
-        String createTableListSql = "";
-        if (dbType.equalsIgnoreCase("Oracle")) {
-            createTableListSql = "CREATE TABLE tb_table_list (tablename varchar2(128))";
-        } else {
-            createTableListSql = "CREATE TABLE IF NOT EXISTS tb_table_list (tablename TEXT)";
-        }
-        stmt = null;
-        try {
-            stmt = conn.createStatement();
-            stmt.execute(createTableListSql);
-            logger.info("[场景3] 创建 tb_table_list 表成功");
-        } finally {
-            if (stmt != null) stmt.close();
-        }
+         }
 
-//        1.5 注册被测分区表名
-        String partitionTable = DbManager.getProperty("partition.table_name"); // 可从配置读取
-        String insertTableSql = "INSERT INTO tb_table_list VALUES('" + partitionTable + "')";
-        stmt = null;
-        try {
-            stmt = conn.createStatement();
-            stmt.execute(insertTableSql);
-            logger.info("[场景3] 注册分区表： " + partitionTable + "成功");
-        } finally {
-            if (stmt != null) stmt.close();
-        }
+         //        1.3 将选中的表重命名为 tb_usernum_list
+         String renameSql = "ALTER TABLE " + selectedTable + " RENAME TO tb_usernum_list";
+         stmt = null;
+         try {
+         stmt = conn.createStatement();
+         stmt.execute(renameSql);
+         logger.info("[场景3] 成功将号码池表 " + selectedTable + " 重命名为 tb_usernum_list");
+         } finally {
+         if (stmt != null) stmt.close();
+         }
 
-//        1.6 创建测试记录表1
-        String createRecordSql = "";
-        if (dbType.equalsIgnoreCase("Oracle")) {
-            createRecordSql = "CREATE TABLE " + recordTable1 + "(\n" +
-                    "thread_name varchar2(128),\n" +
-                    "missionid varchar2(128),\n" +
-                    "query_num varchar2(128),\n" +
-                    "return_time number,\n" +
-                    "count_finish_time number,\n" +
-                    "count number,\n" +
-                    "record_time timestamp\n" +
-                    ")";
-        } else {
-            createRecordSql = "CREATE TABLE IF NOT exists " + recordTable1 + "(\n" +
-                    "thread_name text,\n" +
-                    "missionid text,\n" +
-                    "query_num text,\n" +
-                    "return_time numeric,\n" +
-                    "count_finish_time numeric,\n" +
-                    "count numeric,\n" +
-                    "record_time timestamp\n" +
-                    ");";
-        }
-        stmt = null;
-        try {
-            stmt = conn.createStatement();
-            stmt.execute(createRecordSql);
-            logger.info("[场景3] 创建record table " + recordTable1 + " 表成功");
-        } finally {
-            if (stmt != null) stmt.close();
-        }
-*/
+         //        1.4 创建 tb_table_list
+         String createTableListSql = "";
+         if (dbType.equalsIgnoreCase("Oracle")) {
+         createTableListSql = "CREATE TABLE tb_table_list (tablename varchar2(128))";
+         } else {
+         createTableListSql = "CREATE TABLE IF NOT EXISTS tb_table_list (tablename TEXT)";
+         }
+         stmt = null;
+         try {
+         stmt = conn.createStatement();
+         stmt.execute(createTableListSql);
+         logger.info("[场景3] 创建 tb_table_list 表成功");
+         } finally {
+         if (stmt != null) stmt.close();
+         }
+
+         //        1.5 注册被测分区表名
+         String partitionTable = DbManager.getProperty("partition.table_name"); // 可从配置读取
+         String insertTableSql = "INSERT INTO tb_table_list VALUES('" + partitionTable + "')";
+         stmt = null;
+         try {
+         stmt = conn.createStatement();
+         stmt.execute(insertTableSql);
+         logger.info("[场景3] 注册分区表： " + partitionTable + "成功");
+         } finally {
+         if (stmt != null) stmt.close();
+         }
+
+         //        1.6 创建测试记录表1
+         String createRecordSql = "";
+         if (dbType.equalsIgnoreCase("Oracle")) {
+         createRecordSql = "CREATE TABLE  " + recordTable1 + " ( \n" +
+         "thread_name varchar2(128), \n" +
+         "missionid varchar2(128), \n" +
+         "query_num varchar2(128),\n" +
+         "return_time number,\n" +
+         "count_finish_time number,\n" +
+         "count number,\n" +
+         "record_time TIMESTAMP)";
+         } else {
+         createRecordSql = "CREATE TABLE IF NOT EXISTS " + recordTable1 + " (" +
+         "thread_name TEXT," +
+         "missionid TEXT," +
+         "query_num TEXT," +
+         "return_time NUMERIC," +
+         "count_finish_time NUMERIC," +
+         "count NUMERIC," +
+         "record_time TIMESTAMP)";
+         }
+
+         stmt = null;
+         try {
+         stmt = conn.createStatement();
+         stmt.execute(createRecordSql);
+         logger.info("[场景3] 创建record table " + recordTable1 + " 表成功");
+         } finally {
+         if (stmt != null) stmt.close();
+         }
+
+         */
+
         logger.info("数据库初始化完成，即将启动并发读测试...");
 
 //        2. 启动性能监控
         String monitorInterval60 = DbManager.getProperty("monitorInterval.60");
         logger.info("启动性能监控 iostat 和 dstat，间隔为 " + monitorInterval60 + " 秒...");
+        MonitorIOUtils.MonitorProcesses monitors = MonitorIOUtils.startIOstatDstatOutput(Scenario3,monitorInterval60,"read");
 
-        MonitorIOUtils.MonitorProcesses monitors = MonitorIOUtils.startIOstatDstatOutput(Scenario3, monitorInterval60, "read");
 
-
-//       3. 执行并发随机读程序
+//        3. 执行并发随机读程序
         int timeHour = Integer.parseInt(DbManager.getProperty("timeout.read.hour"));
         String logFile = Scenario3 + "_read_out_" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".log";
         JavaProcessExecutor.executeJavaProcess(tableMigJar, configProperties, timeHour, logFile);
 
         MonitorIOUtils.stopMonitoring(monitors);
 
-//        获取部分指标信息
-        RecordTableSelector.recordTableSqlList(conn,recordTable1);
+
+        // 获取部分指标信息
+        RecordTableSelector.recordTableSqlList(conn, recordTable1);
 
     }
 
 
     /**
      * 场景4： 逐条入库（insert values） 执行三次 每次入库15个文件
-     *
      */
     public void runScenario4() throws Exception {
         String Scenario4 = "Scenario4";
 //        1. 确保先创建表和索引
-        PrepareScenarioEnvironment.prepareScenario4Environment(conn,dbType);
+        PrepareSecnarioEnvironment.prepareScenario4Environment(conn, dbType);
 
 //        2. 修改 l2o.properties，设置 file.num = 15,thread.num = 10,bulkload = false
         String insertFileNum = DbManager.getProperty("insert.file.num");
@@ -395,14 +378,9 @@ public class SceneExecutor {
 
 //            3. 启动性能监控
             logger.info("[场景4] 启动 iostat / dstat 监控，间隔: " + monitorInterval600);
+            String logRound = "insertInto"+round;
+            MonitorIOUtils.MonitorProcesses monitors = MonitorIOUtils.startIOstatDstatOutput(Scenario4,monitorInterval600,logRound);
 
-            MonitorIOUtils.MonitorProcesses monitors = MonitorIOUtils.startIOstatDstatOutput(Scenario4,monitorInterval600,"insertInto");
-           /* Process iostat = new ProcessBuilder("iostat", "-xm", monitorInterval)
-                    .redirectOutput(new File(Scenario4 + "_insertInto_iostat" + monitorInterval + "_round" + round + ".log"))
-                    .start();
-            Process dstat = new ProcessBuilder("dstat", monitorInterval)
-                    .redirectOutput(new File(Scenario4 + "_insertInto_dstat" + monitorInterval + "_round" + round + ".log"))
-                    .start();*/
 
 //            4. 调用jar包执行
             long start = System.currentTimeMillis();
@@ -410,48 +388,54 @@ public class SceneExecutor {
             JavaProcessExecutor.executeJavaProcess(insertIntoJar, l2oProperties, 0, logFile);
             long end = System.currentTimeMillis();
 
-            logger.info("[场景4] 第 " + round + " 次入库完成，耗时：" + ((end - start) / 1000.0) + " 秒");
+            double finishTimeSec = (end - start) / 1000.0;
+            //        一个文件大小为4102Mb
+            double rMB_sec = (Integer.parseInt(insertFileNum) * fileSizeMb)/finishTimeSec;
 
-           MonitorIOUtils.stopMonitoring(monitors);
+            logger.info("[场景4] 第 " + round + " 次入库完成，耗时：" + finishTimeSec + " 秒");
+            logger.info("[场景4] 第 " + round + " 次入库完成，获取到的指标数据 rMB/sec：" + rMB_sec);
+
+
+            MonitorIOUtils.stopMonitoring(monitors);
         }
 
         logger.info("[场景4] 所有逐条入库执行完成。");
     }
 
-
     /**
+     *  场景5 并发随机读+逐条入库
      *
      * @throws IOException
      */
     public void runScenario5() throws IOException, SQLException {
         logger.info("[场景5] 开始执行：并发执行场景3和场景4");
         String Scenario5 = "Scenario5";
+        int fileInsertNum = Integer.parseInt(DbManager.getProperty("binfaInsert.file.num"));
+        int insert150FileRowNum = 1099500150;
+        int timeHour = Integer.parseInt(DbManager.getProperty("timeout.binfa.hour"));
+        int timeSec = timeHour * 3600;
 
 //        准备环境，初始化
-        PrepareScenarioEnvironment.prepareScenario5Environment(conn,insertTableEvt,recordTable2,dbType);
+        PrepareSecnarioEnvironment.prepareScenario5Environment(conn, insertTableEvt, recordTable2, dbType);
+
 
 //         1. 启动性能监控
-        String monitorInterval = DbManager.getProperty("monitorInterval.600");
-        logger.info("[场景5] 启动 iostat 和 dstat 监控成功，间隔: " + monitorInterval + "s");
-        MonitorIOUtils.MonitorProcesses monitors = MonitorIOUtils.startIOstatDstatOutput(Scenario5,monitorInterval,"binfa");
-/*        Process iostat = new ProcessBuilder("iostat", "-xm", monitorInterval)
-                .redirectOutput(new File(Scenario5 + "_binfa_iostat" + monitorInterval + ".log"))
-                .start();
-        Process dstat = new ProcessBuilder("dstat", monitorInterval)
-                .redirectOutput(new File(Scenario5 + "_binfa_dstat" + monitorInterval + ".log"))
-                .start();*/
+        String monitorInterval600 = DbManager.getProperty("monitorInterval.600");
+        MonitorIOUtils.MonitorProcesses monitors = MonitorIOUtils.startIOstatDstatOutput(Scenario5,monitorInterval600,"binfa");
+        logger.info("[场景5] 启动 iostat 和 dstat 监控成功，间隔: " + monitorInterval600 + "s");
 
-//        3. 并发执行
+
+//        2. 并发执行
         ExecutorService executor = Executors.newFixedThreadPool(2); // 开两个线程
 
         long start = System.currentTimeMillis();
         Future<?> future1 = executor.submit(() -> {
             try {
                 // 场景3：并发随机读 3h 100并发
-                int timeHour = Integer.parseInt(DbManager.getProperty("timeout.binfa.hour"));
+
                 logger.info("并发任务1（随机读：100个并发 并发随机读"+timeHour+"小时）");
                 String logFile = Scenario5 + "_100read_out_" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".log";
-                JavaProcessExecutor.executeJavaProcess(tableMigJar,configProperties,timeHour,logFile);
+                JavaProcessExecutor.executeJavaProcess(tableMigJar, configProperties, timeHour, logFile);
             } catch (Exception e) {
                 logger.error("并发任务1（随机读）执行失败", e);
                 e.printStackTrace();
@@ -461,8 +445,8 @@ public class SceneExecutor {
         Future<?> future2 = executor.submit(() -> {
             try {
                 //场景4：逐条入库
-                String fileNum = DbManager.getProperty("binfaInsert.file.num");
-                logger.info("并发任务2（逐条入库：执行入库 "+fileNum+"个文件，每个file大概4.1G）");
+
+                logger.info("并发任务2 （逐条入库：执行入库"+fileInsertNum+"个file，每个file大概4.1G）");
                 long startTime = System.currentTimeMillis();
                 String logFile = Scenario5 + "_insert150File_out_" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".log";
                 JavaProcessExecutor.executeJavaProcess(insertIntoJar, l2oProperties, 0, logFile);
@@ -492,19 +476,43 @@ public class SceneExecutor {
 
 //        5.停止监控进程
         MonitorIOUtils.stopMonitoring(monitors);
-    /*    destroyIfAlive(iostat);
-        destroyIfAlive(dstat);*/
+
         logger.info("[场景5] 停止性能监控进程完成");
 
 //        6.获取部分指标信息
-        RecordTableSelector.recordTableSqlList(conn,recordTable2);
+        RecordTableSelector.recordTableSqlList(conn, recordTable2);
+
+//
+        double row_sec = insert150FileRowNum/timeSec;
+        logger.info("[场景5] 获取到的指标数据 row/sec：" + row_sec);
+
 
         conn.close();
-
 
         logger.info("[场景5] 场景3和场景4均已执行完毕，场景5结束");
     }
 
+
+    private void createIndex(Statement stmt, String indexName, String tableName, String columnName) throws SQLException {
+        long start = System.currentTimeMillis();
+        String sql = "";
+        if (dbType.equalsIgnoreCase("Oracle")) {
+            sql = String.format("CREATE INDEX %s ON %s (%s) LOCAL", indexName, tableName, columnName);
+        } else {
+            sql = String.format("CREATE INDEX %s ON %s (%s)", indexName, tableName, columnName);
+        }
+        logger.info("[场景1] 开始创建分区索引: {} on {}({})", indexName, tableName, columnName);
+        stmt.execute(sql);
+        long end = System.currentTimeMillis();
+        logger.info(dbType + "数据库：索引 {} 创建耗时: {} 秒", indexName, (end - start) / 1000);
+    }
+
+    private static void destroyIfAlive(Process process) {
+        if (process != null && process.isAlive()) {
+            process.destroy();
+            logger.info("已终止 " + process + " 进程");
+        }
+    }
 
     public String getDbDriverClass() {
         return dbDriverClass;
@@ -529,6 +537,8 @@ public class SceneExecutor {
     public String getDataPath() {
         return dataPath;
     }
+
 }
+
 
 

@@ -12,6 +12,7 @@ import java.io.InputStream;
 
 public class DbManager {
 
+    private static final Logger logger = LoggerFactory.getLogger(DbManager.class);
     private static final Properties props = new Properties();
 
     static {
@@ -21,11 +22,11 @@ public class DbManager {
                 props.load(input);
             }
         } catch (Exception e) {
-            throw new RuntimeException("加载数据库配置失败: " + e.getMessage(), e);
+            throw new RuntimeException("加载数据库配置失败：" + e.getMessage(), e);
         }
     }
 
-    public static Connection getConnection(String dbType)  {
+    public static Connection getConnection(String dbType)   {
         String driver = props.getProperty(dbType + ".driver");
         String host = props.getProperty(dbType + ".host");
         String port = props.getProperty(dbType + ".port");
@@ -45,8 +46,8 @@ public class DbManager {
         Connection connection = null;
         try {
             connection = DriverManager.getConnection(url, user, pass);
-        } catch (SQLException e) {
-            throw new RuntimeException("无法获取数据库连接 URL: " + url + " USER: " + user + " PASSWORD: " + pass);
+        } catch (SQLException throwables) {
+            throw new RuntimeException("无法获取数据库连接 URL:"+url + " USER:"+user+" PASSWD:"+pass);
         }
 
         return connection;
@@ -58,9 +59,11 @@ public class DbManager {
         return props.getProperty(key);
     }
 
+
     public static boolean isEnabled(String key){
         return Boolean.parseBoolean(props.getProperty(key,"true"));
     }
 }
+
 
 

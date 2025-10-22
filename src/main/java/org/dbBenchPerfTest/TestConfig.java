@@ -23,6 +23,9 @@ public class TestConfig {
     private final String recordTable1 = "tb_test_record_sql1";
     private final String recordTable2 = "tb_test_record_sql2";
 
+    private final String recordTable3 = "tb_test_record_sql3";
+    private final String recordTable4 = "tb_test_record_sql4";
+
     // 依赖的 jar
     private final String tableMigJar = "tableMigration.jar";
     private final String insertIntoJar = "InsertIntoOracle.jar";
@@ -62,6 +65,14 @@ public class TestConfig {
 
     public String getRecordTable1() { return recordTable1; }
     public String getRecordTable2() { return recordTable2; }
+
+    public String getRecordTable3() {
+        return recordTable3;
+    }
+
+    public String getRecordTable4() {
+        return recordTable4;
+    }
 
     public String getTableMigJar() {
         return tableMigJar;
@@ -116,4 +127,5 @@ public class TestConfig {
         return dbDriverClass;
     }
 }
+
 

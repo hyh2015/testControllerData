@@ -17,45 +17,44 @@ public class PatitionTableCreator {
 
         try (Statement stmt = conn.createStatement()) {
 //            stmt.execute("DROP TABLE IF EXISTS " + partTableName);
-
             String createTableSql = "";
-            if (dbType.equalsIgnoreCase("Oracle")) {
-                createTableSql = "create table "+partTableName+"(\n" +
-                        "begintime timestamp,\n" +
-                        "usernum varchar(128),\n" +
-                        "imei varchar(128),\n" +
-                        "calltype varchar(128),\n" +
-                        "netid varchar(128),\n" +
-                        "lai varchar(128),\n" +
-                        "ci varchar(128),\n" +
-                        "imsi varchar(128),\n" +
-                        "start_time varchar(128),\n" +
-                        "end_time varchar(128),\n" +
-                        "longitude varchar(128),\n" +
-                        "latitude varchar(128),\n" +
-                        "lacci varchar(128),\n" +
-                        "timespan varchar(128),\n" +
-                        "extra_longitude varchar(128),\n" +
-                        "extra_latitude varchar(128),\n" +
-                        "geospan varchar(128),\n" +
-                        "anchorhash varchar(128),\n" +
-                        "extra_geohash varchar(128),\n" +
-                        "bd varchar(128),\n" +
-                        "ad varchar(128),\n" +
-                        "user_id varchar(128),\n" +
-                        "address varchar(256),\n" +
-                        "car_id varchar(128),\n" +
-                        "mac varchar(128),\n" +
-                        "mobile_mode varchar(128),\n" +
-                        "usernum1 varchar(128),\n" +
-                        "area varchar(128),\n" +
-                        "ipv4 varchar(128),\n" +
-                        "ipv6 varchar(128),\n" +
-                        "mission_id varchar(256),\n" +
-                        "bankcard_id varchar(128)\n" +
+            if (dbType.equalsIgnoreCase("Oracle")){
+                createTableSql = "CREATE TABLE  "+partTableName+"(\n" +
+                        "begintime date,\n" +
+                        "usernum varchar2(128),\n" +
+                        "imei varchar2(128),\n" +
+                        "calltype varchar2(128),\n" +
+                        "netid varchar2(128),\n" +
+                        "lai varchar2(128),\n" +
+                        "ci varchar2(128),\n" +
+                        "imsi varchar2(128),\n" +
+                        "start_time varchar2(128),\n" +
+                        "end_time varchar2(128),\n" +
+                        "longitude varchar2(128),\n" +
+                        "latitude varchar2(128),\n" +
+                        "lacci varchar2(128),\n" +
+                        "timespan varchar2(128),\n" +
+                        "extra_longitude varchar2(128),\n" +
+                        "extra_latitude varchar2(128),\n" +
+                        "geospan varchar2(128),\n" +
+                        "anchorhash varchar2(128),\n" +
+                        "extra_geohash varchar2(128),\n" +
+                        "bd varchar2(128),\n" +
+                        "ad varchar2(128),\n" +
+                        "user_id varchar2(128),\n" +
+                        "address varchar2(256),\n" +
+                        "car_id varchar2(128),\n" +
+                        "mac varchar2(128),\n" +
+                        "mobile_mode varchar2(128),\n" +
+                        "usernum1 varchar2(128),\n" +
+                        "area varchar2(128),\n" +
+                        "ipv4 varchar2(128),\n" +
+                        "ipv6 varchar2(128),\n" +
+                        "mission_id varchar2(256),\n" +
+                        "bankcard_id varchar2(128)\n" +
                         ")";
-            } else {
-                 createTableSql = "CREATE TABLE IF NOT EXISTS " + partTableName + " ("
+            }else {
+                createTableSql = "CREATE TABLE IF NOT EXISTS " + partTableName + " ("
                         + "begintime text," + "usernum text," + "imei text," + "calltype text," + "netid text," + "lai text," +
                         "ci text," + "imsi text," + "start_time text," + "end_time text," + "longitude text," + "latitude text," +
                         "lacci text," + "timespan text," + "extra_longitude text," + "extra_latitude text," + "geospan text," +
@@ -65,8 +64,7 @@ public class PatitionTableCreator {
                         + ") ";
             }
 
-            if (dbType.equalsIgnoreCase("pgdb")
-                    || dbType.equalsIgnoreCase("ivory")) {
+            if (dbType.equalsIgnoreCase("pgdb") || dbType.equalsIgnoreCase("ivory")) {
                 createTableSql += "PARTITION BY RANGE (begintime)";
                 logger.info(dbType+"数据库开始创建分区表基表："+partTableName);
                 stmt.execute(createTableSql);
@@ -138,3 +136,4 @@ public class PatitionTableCreator {
     }
 
 }
+

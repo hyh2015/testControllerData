@@ -5,7 +5,7 @@ import java.sql.SQLException;
 
 public interface DatabaseInface {
 
-    void createPartitionTable();
+    void createPartitionTable() throws SQLException;
     void copyData() throws IOException;      // for scenario1
     void createPartIndexes() throws IOException;
 //    void distinctSql() throws SQLException;      // for scenario2

@@ -18,6 +18,8 @@ public class DatabaseFactory {
                 return new VastbaseDatabase(config);
             case "ivory":
                 return new IvoryDatabase(config);
+            case "gbasedbt":
+                return new GBaseDatabase(config);
             default:
                 throw new IllegalArgumentException("不支持的数据库类型: " + dbType);
         }

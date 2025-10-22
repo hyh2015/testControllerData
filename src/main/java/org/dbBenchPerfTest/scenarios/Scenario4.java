@@ -23,7 +23,7 @@ public class Scenario4 implements Scenario {
     @Override
     public void run(DatabaseInface db) throws Exception {
 
-        logger.info("-----------------------["+scenario4+"] 开始执行 --------------------------");
+        logger.info("----------------------------[" + scenario4 + "] 开始执行 -------------------------------");
 
 //        1. 修改 l2o.properties，设置 file.num = 15,thread.num = 10,bulkload = false
         String insertFileNum = DbManager.getProperty("insert.file.num");
@@ -38,17 +38,17 @@ public class Scenario4 implements Scenario {
         String l2oProperties = config.getL2oProperties();
 
 //        3. 确保先创建表和索引
-        PrepareScenarioEnvironment.prepareScenario4Environment(config.getConn(), config.getDbType());
+        PrepareSecnarioEnvironment.prepareScenario4Environment(config.getConn(), config.getDbType());
 
         String monitorInterval600 = DbManager.getProperty("monitorInterval.600");
 
-        for (int round = 1; round <= 3; round++) {
+        for (int round = 4; round <= 5; round++) {
             logger.info("[Scenario4] 第 " + round + " 次逐条入库开始...");
 
 //           4. 启动性能监控
             logger.info("[Scenario4] 启动 iostat / dstat 监控，间隔: " + monitorInterval600);
 
-            MonitorIOUtils.MonitorProcesses monitors = MonitorIOUtils.startIOstatDstatOutput("Scenario4", monitorInterval600, "insertInto");
+            MonitorIOUtils.MonitorProcesses monitors = MonitorIOUtils.startIOstatDstatOutput("Scenario4", monitorInterval600, "insertInto"+round);
 
 //            5. 调用jar包执行
             long start = System.currentTimeMillis();
@@ -64,3 +64,4 @@ public class Scenario4 implements Scenario {
 
     }
 }
+
