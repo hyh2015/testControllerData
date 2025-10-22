@@ -6,6 +6,7 @@ import org.dbBenchPerfTest.inface.Scenario;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testController.DbManager;
+import org.testController.PrepareSecnarioEnvironment;
 
 import java.sql.ResultSet;
 import java.sql.Statement;
