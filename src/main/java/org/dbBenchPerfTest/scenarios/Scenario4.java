@@ -20,6 +20,7 @@ public class Scenario4 implements Scenario {
         this.config = config;
     }
 
+
     @Override
     public void run(DatabaseInface db) throws Exception {
 
@@ -42,7 +43,9 @@ public class Scenario4 implements Scenario {
 
         String monitorInterval600 = DbManager.getProperty("monitorInterval.600");
 
-        for (int round = 4; round <= 5; round++) {
+        for (int round = 1; round <= 3
+
+                ; round++) {
             logger.info("[Scenario4] 第 " + round + " 次逐条入库开始...");
 
 //           4. 启动性能监控

@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testController.*;
 
-import java.sql.Connection;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.concurrent.ExecutorService;
@@ -54,7 +53,7 @@ public class Scenario5 implements Scenario {
 
         Future<?> future1 = executor.submit(() -> {
             try {
-                // 场景3：并发随机读 3h 100并发
+                // 场景3：并发随机读  100并发读
                 int timeHour = Integer.parseInt(DbManager.getProperty("timeout.binfa.hour"));
                 logger.info("并发任务1（随机读：100个并发 并发随机读"+timeHour+"小时）");
                 String logFile = Scenario5 + "_100read_out_" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".log";

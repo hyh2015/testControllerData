@@ -40,7 +40,7 @@ public class HighgoDatabase implements DatabaseInface  {
         String partTableName = config.getPartTableName();
 
         String  createTableSql = "CREATE TABLE IF NOT EXISTS " + partTableName + " ("
-                + "begintime text," + "usernum text," + "imei text," + "calltype text," + "netid text," + "lai text," +
+                + "begintime date," + "usernum text," + "imei text," + "calltype text," + "netid text," + "lai text," +
                 "ci text," + "imsi text," + "start_time text," + "end_time text," + "longitude text," + "latitude text," +
                 "lacci text," + "timespan text," + "extra_longitude text," + "extra_latitude text," + "geospan text," +
                 "anchorhash text," + "extra_geohash text," + "bd text," + "ad text," + "user_id text," + "address text," +

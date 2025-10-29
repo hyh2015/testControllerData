@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testController.DbManager;
 import org.testController.JavaProcessExecutor;
+import org.testController.PartitionIndexCreator;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -14,13 +15,16 @@ import java.sql.Statement;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 public class VastbaseDatabase implements DatabaseInface {
 
     private static final Logger logger = LoggerFactory.getLogger(VastbaseDatabase.class);
 
     private final TestConfig config;
+    private final String dataType="VASTBASE";
 
     public VastbaseDatabase(TestConfig config) {
         this.config = config;
@@ -29,12 +33,12 @@ public class VastbaseDatabase implements DatabaseInface {
 
     @Override
     public void createPartitionTable() {
-        logger.info("[预处理] VASTBASE 数据库开始创建分区表...");
+    /*    logger.info("[预处理] "+dataType+" 数据库开始创建分区表...");
 
         String partTableName = config.getPartTableName();
 
         String  createTableSql = "CREATE TABLE IF NOT EXISTS " + partTableName + " ("
-                + "begintime text," + "usernum text," + "imei text," + "calltype text," + "netid text," + "lai text," +
+                + "begintime date," + "usernum text," + "imei text," + "calltype text," + "netid text," + "lai text," +
                 "ci text," + "imsi text," + "start_time text," + "end_time text," + "longitude text," + "latitude text," +
                 "lacci text," + "timespan text," + "extra_longitude text," + "extra_latitude text," + "geospan text," +
                 "anchorhash text," + "extra_geohash text," + "bd text," + "ad text," + "user_id text," + "address text," +
@@ -55,20 +59,20 @@ public class VastbaseDatabase implements DatabaseInface {
         }
         partitionSql.setLength(partitionSql.length() - 1);
         partitionSql.append(")");
-        logger.info("VASTBASE 数据库开始执行创建分区表："+partTableName);
+        logger.info(dataType+" 数据库开始执行创建分区表："+partTableName);
         try(Connection connec = DbManager.getConnection(config.getDbType());
             Statement stmt = connec.createStatement()) {
             stmt.execute(partitionSql.toString());
         } catch (SQLException e) {
-            logger.error("VASTBASE 数据库创建分区表失败");
+            logger.error(dataType+" 数据库创建分区表失败");
             throw new RuntimeException(e);
         }
-        logger.info("VASTBASE 数据库创建分区表："+partTableName+"成功");
+        logger.info(dataType+" 数据库创建分区表："+partTableName+"成功");*/
     }
 
     @Override
     public void copyData() throws IOException {
-        logger.info("Highgo数据库 批量入库...执行 COPY STDIN ");
+    /*    logger.info(dataType+" 数据库 批量入库...执行 COPY STDIN ");
 
         String insertIntoJar = config.getInsertIntoJar();
         String l2oProperties = config.getL2oProperties();
@@ -83,11 +87,26 @@ public class VastbaseDatabase implements DatabaseInface {
         } catch (Exception e) {
             logger.error("批量入库执行程序失败", e);
             throw e;
-        }
+        }*/
     }
 
     @Override
-    public void createPartIndexes() throws IOException {
+    public void createPartIndexes() {
 
+        String partTableName = config.getPartTableName();
+
+        List<String> indexFields = new ArrayList<>();
+        indexFields.add("usernum");
+        indexFields.add("imei");
+        indexFields.add("imsi");
+        indexFields.add("lai,ci");
+        List<String> indexNames = new ArrayList<>();
+        indexNames.add(DbManager.getProperty("index.name.1") + partTableName);
+        indexNames.add(DbManager.getProperty("index.name.2") + partTableName);
+        indexNames.add(DbManager.getProperty("index.name.3") + partTableName);
+        indexNames.add(DbManager.getProperty("index.name.4") + partTableName);
+
+        PartitionIndexCreator.createPartitionIndexesHgVb(config.getConn(), partTableName, indexFields, indexNames, config.getDbType());
     }
+
 }

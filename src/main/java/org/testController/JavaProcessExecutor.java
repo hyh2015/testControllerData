@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class JavaProcessExecutor {
@@ -44,7 +43,7 @@ public class JavaProcessExecutor {
             process = builder.start();
             exitCode = process.waitFor();
             if (exitCode == 124) {
-                logger.warn("jar 包因超时被 timeout 强制终止");
+                logger.info("java程序："+jarFileName+"执行时间已到, timeout 强制终止");
             } else {
                 logger.info("java程序：" + jarFileName + "正常退出，退出码：" + exitCode);
             }

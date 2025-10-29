@@ -1,5 +1,6 @@
 package org.dbBenchPerfTest;
 
+import org.dbBenchPerfTest.checkDatabase.CheckDatabaseInstall;
 import org.dbBenchPerfTest.dataBase.DatabaseFactory;
 import org.dbBenchPerfTest.inface.DatabaseInface;
 import org.dbBenchPerfTest.scenarios.*;
@@ -16,6 +17,10 @@ public class TestControllerNew {
     }
 
     public void runAllTests() throws Exception {
+        if(DbManager.isEnabled("is.install.ivory")){
+            new CheckDatabaseInstall().checkAndInstallDatabase();
+        }
+
         if (DbManager.isEnabled("scene.mock.enabled")) {
             new ScenarioMockData(config).run(db);
         }
