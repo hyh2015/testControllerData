@@ -36,7 +36,7 @@ public class Scenario5 implements Scenario {
         logger.info("[场景5] 开始执行：并发执行场景3和场景4");
         String Scenario5 = "Scenario5";
         String insertTableEvt = config.getInsertTableEvt();
-        String recordTable2 = config.getRecordTable2();
+        String recordTable1 = config.getRecordTable1();
         String dbType = config.getDbType();
         String tableMigJar = config.getTableMigJar();
         String configProperties = config.getConfigProperties();
@@ -44,7 +44,7 @@ public class Scenario5 implements Scenario {
         String l2oProperties = config.getL2oProperties();
 
 //        2. 准备环境，初始化
-        PrepareSecnarioEnvironment.prepareScenario5Environment(config.getConn(), insertTableEvt, recordTable2, dbType);
+        PrepareSecnarioEnvironment.prepareScenario5Environment(config.getConn(), insertTableEvt, recordTable1, dbType);
 
 
 
@@ -100,7 +100,7 @@ public class Scenario5 implements Scenario {
         logger.info("[场景5] 停止性能监控进程完成");
 
 //        6.获取部分指标信息
-        RecordTableSelector.recordTableSqlList(config.getConn(), recordTable2);
+        RecordTableSelector.recordTableSqlList(config.getConn(), recordTable1);
 
         config.getConn().close();
 

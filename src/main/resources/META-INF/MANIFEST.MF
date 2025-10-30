@@ -1,5 +1,5 @@
 Manifest-Version: 1.0
-Main-Class: org.dbBenchPerfTest.checkDatabase.CheckDatabaseInstall
+Main-Class: org.testController.Start
 Class-Path: mockdata.jar h2_driver.jar guava-22.0.jar druid-1.1.10.jar c
  ommons-io-2.4.jar DBBenchPerfTest.jar disruptor-3.3.4.jar InsertIntoOra
  cle.jar log4j-api-2.11.0.jar slf4j-api-1.7.10.jar log4j-core-2.11.0.jar

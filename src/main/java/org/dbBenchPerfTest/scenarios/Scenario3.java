@@ -28,7 +28,7 @@ public class Scenario3 implements Scenario {
 
     @Override
     public void run(DatabaseInface db) throws Exception {
-        String mode1 = "1";
+        String scenario3mode1 = "1";
 
         logger.info("----------------------------[" + scenario3 + "] 开始执行 -------------------------------");
         String recordTable1 = config.getRecordTable1();
@@ -37,7 +37,7 @@ public class Scenario3 implements Scenario {
         String dbType = config.getDbType();
 
 //       1. 更新 config.properties 的配置
-        if (!UpdateConfProperties.updateConcurrentReadConfig(mode1)) {
+        if (!UpdateConfProperties.updateConcurrentReadConfig(scenario3mode1)) {
             logger.error("["+scenario3+"] 更新 config.properties 配置文件失败，终止执行");
             return;
         }

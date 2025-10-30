@@ -180,7 +180,6 @@ public class PrepareSecnarioEnvironment {
             try (Statement stmtTruncate = conn.createStatement()) {
                 stmtTruncate.execute("TRUNCATE TABLE " + tableName);
                 logger.info("[场景4] 清空 " + tableName + " 表成功");
-
                 return;
             }
         } else {
@@ -282,14 +281,16 @@ public class PrepareSecnarioEnvironment {
      *  为场景5 做环境初始化
      * @param connect
      * @param insertTableEvt  清空入库表 tb_evt_i
-     * @param recordTable2    创建并发读记录表 tb_test_record_sql2
+     * @param recordTable1    并发读记录表 tb_test_record_sql1
      * @param dbType          数据库类型
      */
-    public static void prepareScenario5Environment(Connection connect, String insertTableEvt, String recordTable2, String dbType) throws SQLException {
-
-
-//        5.1 创建测试记录表2
+    public static void prepareScenario5Environment(Connection connect, String insertTableEvt, String recordTable1, String dbType) throws SQLException {
         String owner = DbManager.getProperty(dbType + ".user");
+        // 5.1 继续使用recordtable1表进行并发读 保持前后场景读取类型一致
+        handleRecordTable(connect,recordTable1,owner,dbType);
+
+/*
+//        5.1 创建测试记录表2
         boolean recordTable2Exists = checkTableIsExist(connect, recordTable2, dbType, owner);
         if(recordTable2Exists){
             try (Statement stmtTruncate = connect.createStatement()) {
@@ -324,12 +325,12 @@ public class PrepareSecnarioEnvironment {
         } catch (SQLException throwables) {
             logger.error("[场景5] 5.1 创建record table " + recordTable2 + " 表失败");
             throwables.printStackTrace();
-        }
+        }*/
 
 
 //        5.2 更新config.properties配置文件
-        String mode2 = "2";
-        if (!UpdateConfProperties.updateConcurrentReadConfig(mode2)) {
+        String scenario5mode1 = "1";
+        if (!UpdateConfProperties.updateConcurrentReadConfig(scenario5mode1)) {
             logger.error("[场景5] 5.2 更新 config.properties 配置文件失败，终止执行");
             return;
         }
@@ -353,6 +354,23 @@ public class PrepareSecnarioEnvironment {
         logger.info("[场景5] 5.4 更新 l2o.properties 文件成功.");
     }
 
+    // 对record表1进行处理
+    private static void handleRecordTable(Connection connect, String recordTable1, String owner, String dbType) throws SQLException {
+
+        String newTable = recordTable1 + "_Scenario5_" + System.currentTimeMillis();
+
+        boolean tableExists = PrepareSecnarioEnvironment.checkTableIsExist(connect, recordTable1, dbType, owner);
+        if (tableExists) {
+            try (Statement stmt = connect.createStatement()) {
+//            备份表到新表
+                stmt.execute("create table "+newTable+" as select * from "+recordTable1);
+                logger.info("将 " + recordTable1 + "表成功备份到表："+newTable +".");
+//            清空原record表
+                stmt.execute("truncate table " + recordTable1);
+                logger.info("清空 " + recordTable1 + " 表成功");
+            }
+        }
+    }
 
     /**
      * 单为GBase并发读写环境使用
