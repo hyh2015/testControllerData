@@ -116,11 +116,14 @@ public class DatabaseInstaller {
 
 
     /**
-     * 直接修改 setupivory.sh 文件中 g_database_rpm_file 的值
+     * 直接修改 setupivory.sh
+     * 文件中 g_database_rpm_file='更新rpm版本包名'
+     * g_database_data='更新ivory数据库的数据目录'
      * 不再创建临时文件。
      */
     private File updateSetupScript(String rpmFileName) throws IOException {
         File scriptFile = new File(scriptPath, "setupivory.sh");
+        String mountPath = DbManager.getProperty("mount.path");
 
         if (!scriptFile.exists()) {
             throw new FileNotFoundException("找不到 setupivory.sh 脚本！路径: " + scriptFile.getAbsolutePath());
@@ -136,6 +139,9 @@ public class DatabaseInstaller {
                 if (line.startsWith("g_database_rpm_file=")) {
                     // 替换为新的包名
                     line = "g_database_rpm_file=\"" + rpmFileName + "\"";
+                } else if (line.startsWith("g_database_data=")) {
+                    // 替换为新的ivory数据目录
+                    line = "g_database_data=\"" + mountPath + "\"";
                 }
                 content.append(line).append(System.lineSeparator());
             }
