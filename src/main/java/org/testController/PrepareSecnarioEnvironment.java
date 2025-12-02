@@ -7,6 +7,8 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class PrepareSecnarioEnvironment {
 
@@ -357,7 +359,8 @@ public class PrepareSecnarioEnvironment {
     // 对record表1进行处理
     private static void handleRecordTable(Connection connect, String recordTable1, String owner, String dbType) throws SQLException {
 
-        String newTable = recordTable1 + "_Scenario5_" + System.currentTimeMillis();
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+        String newTable = recordTable1 + "_Scenario5_" + timestamp;
 
         boolean tableExists = PrepareSecnarioEnvironment.checkTableIsExist(connect, recordTable1, dbType, owner);
         if (tableExists) {
