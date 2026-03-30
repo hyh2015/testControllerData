@@ -48,19 +48,21 @@ public class Scenario5 implements Scenario {
 
 
 
-//        3. 并发执行h
+//        3. 并发执行
         ExecutorService executor = Executors.newFixedThreadPool(2); // 开两个线程
 
         Future<?> future1 = executor.submit(() -> {
             try {
                 // 场景3：并发随机读  100并发读
-                int timeHour = Integer.parseInt(DbManager.getProperty("timeout.binfa.hour"));
-                logger.info("并发任务1（随机读：100个并发 并发随机读"+timeHour+"小时）");
+//                int timeHour = Integer.parseInt(DbManager.getProperty("timeout.binfa.hour"));
+                logger.info(">>>并发任务1（随机读：100个并发）");
                 String logFile = Scenario5 + "_100read_out_" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".log";
-                JavaProcessExecutor.executeJavaProcess(tableMigJar,configProperties,timeHour,logFile);
+
+                JavaProcessExecutor.executeJavaProcess(tableMigJar,configProperties,0,logFile);
             } catch (Exception e) {
-                logger.error("并发任务1（随机读）执行失败", e);
-                e.printStackTrace();
+                logger.warn("任务1执行被中断或捕获到异常：" + e.getMessage());
+            } finally {
+                logger.info("任务1线程已退出。");
             }
         });
 
@@ -68,44 +70,52 @@ public class Scenario5 implements Scenario {
             try {
                 //场景4：逐条入库
                 String fileNum = DbManager.getProperty("binfaInsert.file.num");
-                logger.info("并发任务2（逐条入库：执行入库 "+fileNum+"个文件，每个file大概4.1G）");
+                logger.info(">>>并发任务2（逐条入库：执行入库 "+fileNum+"个文件）");
                 long startTime = System.currentTimeMillis();
                 String logFile = Scenario5 + "_insert"+fileNum+"File_out_" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".log";
+
                 JavaProcessExecutor.executeJavaProcess(insertIntoJar, l2oProperties, 0, logFile);
                 long endTime = System.currentTimeMillis();
                 logger.info("入库完成，耗时：" + ((endTime - startTime) / 1000.0) + " 秒");
             } catch (Exception e) {
-                logger.error("并发任务2（逐条入库）执行失败", e);
-                e.printStackTrace();
+                logger.error("并发任务2执行失败", e);
+                throw e; // 抛出异常以便主线程感知
             }
         });
 
-//        4.等待两个任务完成（可设置最大等待时间）
-        executor.shutdown();
+//        4. 并发控制核心逻辑
         try {
+            future2.get();
+            logger.info("[控制台] 检测到任务2已完成，现在开始强制终止任务1...");
             if (!executor.awaitTermination(24, TimeUnit.HOURS)) {
                 executor.shutdownNow();
                 logger.warn("并发执行时间超过：24h");
             } else {
                 logger.info("[场景5] 所有并发任务执行完成");
             }
-        } catch (InterruptedException e) {
+        } finally {
+            // 关键一步：立即关闭线程池并向所有任务发送 interrupt() 信号
+            // 任务1收到信号后，JavaProcessExecutor 应负责销毁对应的系统进程
             executor.shutdownNow();
-            Thread.currentThread().interrupt();
+
+            try {
+                if (!executor.awaitTermination(24, TimeUnit.HOURS)) {
+                    logger.warn("[场景5] 任务在 24h 内未完全退出，强制继续后续清理工作");
+                }
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
         }
 
 //        5.停止监控进程
         MonitorIOUtils.stopMonitoring(monitors);
-
         logger.info("[场景5] 停止性能监控进程完成");
 
 //        6.获取部分指标信息
         RecordTableSelector.recordTableSqlList(config.getConn(), recordTable1);
-
         config.getConn().close();
 
-
-        logger.info("[场景5] 场景3和场景4均已执行完毕，场景5结束");
+        logger.info("[场景5] 执行完毕，场景5结束");
 
 
     }

@@ -36,19 +36,29 @@ public class JavaProcessExecutor {
             }
         }*/
 
-        Process process = null;
-        int exitCode = -1;
+//        int exitCode = -1;
 
+        Process process = null;
         try {
             process = builder.start();
-            exitCode = process.waitFor();
+            int exitCode = process.waitFor();
             if (exitCode == 124) {
                 logger.info("java程序："+jarFileName+"执行时间已到, timeout 强制终止");
             } else {
                 logger.info("java程序：" + jarFileName + "正常退出，退出码：" + exitCode);
             }
-        } catch (IOException | InterruptedException e) {
-            logger.error("启动或执行java程序失败：" + jarFileName + "", e);
+        } catch (InterruptedException e) {
+            // --- 核心修改逻辑 ---
+            logger.warn("检测到外部中断信号，正在强制停止子进程: " + jarFileName);
+            if (process != null) {
+                // 停止子进程
+                process.destroyForcibly();
+                logger.info("子进程 " + jarFileName + " 已强制销毁。");
+            }
+            // 保持中断状态，通知调用者线程已中断
+            Thread.currentThread().interrupt();
+        } catch (IOException e) {
+            logger.error("启动Java程序失败：" + jarFileName, e);
         }
     }
 
