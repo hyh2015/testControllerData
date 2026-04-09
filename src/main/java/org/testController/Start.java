@@ -20,7 +20,7 @@ public class Start {
             new CheckDatabaseInstall().checkAndInstallDatabase();
         } else if(DbManager.isEnabled("is.install.ivory") &&
                 !dbType.equalsIgnoreCase("ivory")){
-            logger.error("只支持"+dbType+"数据库,暂不支持安装其他类型数据库");
+            logger.error("只支持 ivory 数据库,暂不支持安装其他类型数据库");
         }
 
         logger.info("==== 开始测试数据库: " + dbType + " ====\n");

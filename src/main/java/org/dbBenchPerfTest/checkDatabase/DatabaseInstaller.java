@@ -5,18 +5,19 @@ import org.slf4j.LoggerFactory;
 import org.testController.DbManager;
 
 import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 public class DatabaseInstaller {
 
     private static final Logger logger = LoggerFactory.getLogger(DatabaseInstaller.class);
 
+/*
     private static final String X86_PACKAGE = "IvorySQL-4.5-0ffca11-20250527.x86_64.rpm";
     private static final String ARM_PACKAGE = "IvorySQL-4.5-0ffca11-20250527.aarch64.rpm";
+*/
 
     String scriptPath = DbManager.getProperty("scriptPath");
-
+    static final String X86_PACKAGE = DbManager.getProperty("X86_PACKAGE");
+    static final String ARM_PACKAGE = DbManager.getProperty("ARM_PACKAGE");
 
     public void installDatabase(String dbName){
 
