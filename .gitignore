@@ -36,3 +36,21 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### 构建产物 ###
+out/
+
+### 依赖 jar ###
+# 构建依赖的是兄弟目录 ../libDBB/（IntelliJ 项目库 libDBB），
+# 仓库内的 lib/ 是过期快照，不参与构建
+lib/
+
+### 运行时生成物 ###
+# config.properties 和 l2o.properties 每次运行由 UpdateConfProperties 整体覆盖重写
+config.properties
+l2o.properties
+# mock.sh 由 Mockdata.generateMockTestData() 生成
+mock.sh
+# iostat/dstat 采集结果、各场景输出日志均直接落在运行目录
+logs/
+*.log
