@@ -41,7 +41,7 @@ public class Scenario4 implements Scenario {
 //        3. 确保先创建表和索引
         PrepareSecnarioEnvironment.prepareScenario4Environment(config.getConn(), config.getDbType());
 
-        String monitorInterval600 = DbManager.getProperty("monitorInterval.600");
+        String monitorInterval60 = DbManager.getProperty("monitorInterval.60");
 
         for (int round = 1; round <= 3
 
@@ -49,9 +49,9 @@ public class Scenario4 implements Scenario {
             logger.info("[Scenario4] 第 " + round + " 次逐条入库开始...");
 
 //           4. 启动性能监控
-            logger.info("[Scenario4] 启动 iostat / dstat 监控，间隔: " + monitorInterval600);
+            logger.info("[Scenario4] 启动 iostat / dstat 监控，间隔: " + monitorInterval60);
 
-            MonitorIOUtils.MonitorProcesses monitors = MonitorIOUtils.startIOstatDstatOutput("Scenario4", monitorInterval600, "insertInto"+round);
+            MonitorIOUtils.MonitorProcesses monitors = MonitorIOUtils.startIOstatDstatOutput("Scenario4", monitorInterval60, "insertInto"+round);
 
 //            5. 调用jar包执行
             long start = System.currentTimeMillis();
@@ -67,4 +67,5 @@ public class Scenario4 implements Scenario {
 
     }
 }
+
 

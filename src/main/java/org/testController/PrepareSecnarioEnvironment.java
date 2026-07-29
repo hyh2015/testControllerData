@@ -17,7 +17,7 @@ public class PrepareSecnarioEnvironment {
     public static boolean checkTableIsExist(Connection conn, String tableName, String dbType, String owner) throws SQLException {
 
         String checkSql;
-        if ("pgdb".equalsIgnoreCase(dbType) || "ivory".equalsIgnoreCase(dbType)) {
+        if ("pgdb".equalsIgnoreCase(dbType) || "ivory".equalsIgnoreCase(dbType) || "kingbase".equalsIgnoreCase(dbType)) {
             checkSql = "SELECT to_regclass('" + tableName + "')";
         } else if ("vastdata".equalsIgnoreCase(dbType)) {
             checkSql = "SELECT * from pg_catalog.all_tables where owner=upper('" + owner + "') and table_name=upper('" + tableName + "')";
@@ -35,7 +35,7 @@ public class PrepareSecnarioEnvironment {
         boolean tableExists = false;
         try(Statement stmtCheck = conn.createStatement();ResultSet rs = stmtCheck.executeQuery(checkSql)) {
             if (rs.next()) {
-                if ("pgdb".equalsIgnoreCase(dbType) || "ivory".equalsIgnoreCase(dbType)) {
+                if ("pgdb".equalsIgnoreCase(dbType) || "ivory".equalsIgnoreCase(dbType) || "kingbase".equalsIgnoreCase(dbType)) {
                     tableExists = rs.getString(1) != null;
                 } else {
                     tableExists = true; // 有结果表示存在
@@ -181,7 +181,8 @@ public class PrepareSecnarioEnvironment {
         if(recordTable2Exists){
             try (Statement stmtTruncate = conn.createStatement()) {
                 stmtTruncate.execute("TRUNCATE TABLE " + tableName);
-                logger.info("[场景4] 清空 " + tableName + " 表成功");
+                logger.info(">>> 清空 " + tableName + " 表成功");
+
                 return;
             }
         } else {
@@ -262,7 +263,7 @@ public class PrepareSecnarioEnvironment {
 
             Statement stmt = conn.createStatement();
             stmt.execute(createTableSQL);
-            logger.info("[场景4] 创建入库表 " + tableName + " 成功");
+            logger.info(">>> 创建入库表 " + tableName + " 成功");
 
 //         2. 创建本地索引
             String createIndexSQL = "";
@@ -272,7 +273,7 @@ public class PrepareSecnarioEnvironment {
                 createIndexSQL = "CREATE INDEX " + indexName + " ON " + tableName + " USING BTREE(usernum)";
             }
             stmt.execute(createIndexSQL);
-            logger.info("[场景4] 创建本地索引 " + indexName + " 成功");
+            logger.info(">>> 创建本地索引 " + indexName + " 成功");
 
             stmt.close();
         }
@@ -283,16 +284,17 @@ public class PrepareSecnarioEnvironment {
      *  为场景5 做环境初始化
      * @param connect
      * @param insertTableEvt  清空入库表 tb_evt_i
-     * @param recordTable1    并发读记录表 tb_test_record_sql1
+     * @param recordTable1    创建并发读记录表 tb_test_record_sql1
      * @param dbType          数据库类型
      */
     public static void prepareScenario5Environment(Connection connect, String insertTableEvt, String recordTable1, String dbType) throws SQLException {
         String owner = DbManager.getProperty(dbType + ".user");
-        // 5.1 继续使用recordtable1表进行并发读 保持前后场景读取类型一致
+        // 5.1 继续使用recordTable1表进行并发读  保持前后场景测试 where条件类型一致性
         handleRecordTable(connect,recordTable1,owner,dbType);
 
 /*
 //        5.1 创建测试记录表2
+
         boolean recordTable2Exists = checkTableIsExist(connect, recordTable2, dbType, owner);
         if(recordTable2Exists){
             try (Statement stmtTruncate = connect.createStatement()) {
@@ -327,7 +329,8 @@ public class PrepareSecnarioEnvironment {
         } catch (SQLException throwables) {
             logger.error("[场景5] 5.1 创建record table " + recordTable2 + " 表失败");
             throwables.printStackTrace();
-        }*/
+        }
+*/
 
 
 //        5.2 更新config.properties配置文件
@@ -339,15 +342,21 @@ public class PrepareSecnarioEnvironment {
         logger.info("[场景5] 5.2 更新 config.properties 文件成功");
 
 
-//        5.3 清空tb_evt_i表
-        try (Statement stmtTruncate = connect.createStatement()) {
+//        5.3 处理tb_evt_i表
+        try {
+            prepareScenario4Environment(connect,dbType);
+        } catch (Exception e) {
+            logger.error("[场景5] 5.3 处理表：" + insertTableEvt + "失败");
+            throw new RuntimeException(e);
+        }
+/*        try (Statement stmtTruncate = connect.createStatement()) {
             stmtTruncate.execute("TRUNCATE TABLE " + insertTableEvt);
             logger.info("[场景5] 5.3 清空 " + insertTableEvt + " 表成功");
 
         } catch (SQLException e) {
             logger.error("[场景5] 5.3 清空表：" + insertTableEvt + "失败");
             e.printStackTrace();
-        }
+        }*/
 
 //        5.4 修改 l2o.properties，设置 file.num = 150,thread.num = 10,bulkload = false
         String fileNum = DbManager.getProperty("binfaInsert.file.num");
@@ -356,21 +365,23 @@ public class PrepareSecnarioEnvironment {
         logger.info("[场景5] 5.4 更新 l2o.properties 文件成功.");
     }
 
-    // 对record表1进行处理
-    private static void handleRecordTable(Connection connect, String recordTable1, String owner, String dbType) throws SQLException {
+    // 对场景5中 recordTable1进行处理
+    private static void handleRecordTable(Connection connection, String recordTable1, String owner, String dbType) throws SQLException {
 
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
         String newTable = recordTable1 + "_Scenario5_" + timestamp;
 
-        boolean tableExists = PrepareSecnarioEnvironment.checkTableIsExist(connect, recordTable1, dbType, owner);
+        boolean tableExists = PrepareSecnarioEnvironment.checkTableIsExist(connection, recordTable1, dbType, owner);
         if (tableExists) {
-            try (Statement stmt = connect.createStatement()) {
+
+            try (Statement stmt = connection.createStatement()) {
 //            备份表到新表
                 stmt.execute("create table "+newTable+" as select * from "+recordTable1);
-                logger.info("将 " + recordTable1 + "表成功备份到表："+newTable +".");
-//            清空原record表
+                logger.info("将 " + recordTable1 + "表成功备份到表：" + newTable + ".");
+
+//            清空原record表1
                 stmt.execute("truncate table " + recordTable1);
-                logger.info("清空 " + recordTable1 + " 表成功");
+                logger.info(">>> 清空 " + recordTable1 + " 表成功");
             }
         }
     }
@@ -425,4 +436,5 @@ public class PrepareSecnarioEnvironment {
         }
     }
 }
+
 

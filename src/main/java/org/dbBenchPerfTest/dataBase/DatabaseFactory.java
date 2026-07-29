@@ -20,9 +20,12 @@ public class DatabaseFactory {
                 return new IvoryDatabase(config);
             case "gbasedbt":
                 return new GBaseDatabase(config);
+            case "kingbase":
+                return new KingbaseDatabase(config);
             default:
                 throw new IllegalArgumentException("不支持的数据库类型: " + dbType);
         }
     }
 }
+
 

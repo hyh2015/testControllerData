@@ -1,6 +1,5 @@
 package org.testController;
 
-import org.checkerframework.checker.units.qual.A;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,23 +19,23 @@ public class RecordTableSelector {
 
 
 
-        String avgreturn_secSql = String.format("select AVG(return_time) from (\n" +
-                "select avg(return_time)/1000 return_time,avg(COUNT_FINISH_TIME)/1000 COUNT_FINISH_TIME from  %s\n" +
-                "group by thread_name)",tableName);
+        String avgreturn_secSql = String.format("select AVG(tt.return_time) from (\n" +
+                "select avg(return_time)/1000 return_time,avg(COUNT_FINISH_TIME)/1000 COUNT_FINISH_TIME from %s\n" +
+                "group by thread_name) tt",tableName);
 
-        String avgfinish_secSql = String.format("select AVG(COUNT_FINISH_TIME) from (\n" +
-                "select avg(return_time)/1000 return_time,avg(COUNT_FINISH_TIME)/1000 COUNT_FINISH_TIME from  %s\n" +
-                "group by thread_name)",tableName);
+        String avgfinish_secSql = String.format("select AVG(tt.COUNT_FINISH_TIME) from (\n" +
+                "select avg(return_time)/1000 return_time,avg(COUNT_FINISH_TIME)/1000 COUNT_FINISH_TIME from %s\n" +
+                "group by thread_name) tt",tableName);
 
-        String Maxfinish_secSql = String.format("select AVG(COUNT_FINISH_TIME) from (\n" +
+        String Maxfinish_secSql = String.format("select AVG(tt.COUNT_FINISH_TIME) from (\n" +
                 "select max(COUNT_FINISH_TIME)/1000 COUNT_FINISH_TIME from  %s\n" +
-                "group by thread_name)", tableName);
+                "group by thread_name) tt", tableName);
 
         String sec_100rSQL = String.format("select avg( (COUNT_FINISH_TIME*100)/1000/count) from %s",tableName);
 
         String stddev_avgSQL = String.format("select stddev(COUNT_FINISH_TIME)/avg(COUNT_FINISH_TIME) from %s", tableName);
 
-        logger.info("---------------------------表："+tableName+"的指标数据----------------------------------");
+        logger.info("---------------------------获取表："+tableName+"的指标数据----------------------------------");
 
         // 1. avgreturn/sec
         Double avgreturn = queryForDouble(conn,avgreturn_secSql);
@@ -73,4 +72,5 @@ public class RecordTableSelector {
     }
 
 }
+
 

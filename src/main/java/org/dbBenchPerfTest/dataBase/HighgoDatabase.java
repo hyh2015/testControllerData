@@ -5,10 +5,7 @@ import org.dbBenchPerfTest.TestConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testController.*;
-
-import java.io.IOException;
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.SimpleDateFormat;
@@ -17,10 +14,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+
 
 public class HighgoDatabase implements DatabaseInface  {
 
@@ -112,8 +106,9 @@ public class HighgoDatabase implements DatabaseInface  {
         indexNames.add(DbManager.getProperty("index.name.3") + partTableName);
         indexNames.add(DbManager.getProperty("index.name.4") + partTableName);
 
-        PartitionIndexCreator.createPartitionIndexesHgVb(config.getConn(), partTableName, indexFields, indexNames, config.getDbType());
+        PartitionIndexCreator.createPartitionIndexesOnTable(config.getConn(), partTableName, indexFields, indexNames, config.getDbType());
     }
 
 }
+
 

@@ -5,6 +5,8 @@ import org.slf4j.LoggerFactory;
 import org.testController.DbManager;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 public class DatabaseInstaller {
 
@@ -50,8 +52,6 @@ public class DatabaseInstaller {
             } else {
                 System.out.println("安装失败，请检查脚本输出或日志。");
             }
-
-
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -117,9 +117,7 @@ public class DatabaseInstaller {
 
 
     /**
-     * 直接修改 setupivory.sh
-     * 文件中 g_database_rpm_file='更新rpm版本包名'
-     * g_database_data='更新ivory数据库的数据目录'
+     * 直接修改 setupivory.sh 文件中 g_database_rpm_file 的值
      * 不再创建临时文件。
      */
     private File updateSetupScript(String rpmFileName) throws IOException {
@@ -130,7 +128,7 @@ public class DatabaseInstaller {
             throw new FileNotFoundException("找不到 setupivory.sh 脚本！路径: " + scriptFile.getAbsolutePath());
         }
 
-        logger.info("准备修改脚本 [{}] 中的 rpm 包名为: {}", scriptFile.getAbsolutePath(), rpmFileName);
+        logger.info("准备修改脚本 [{}] 中的 rpm 包名为: {},ivory数据库的数据目录为：{}", scriptFile.getAbsolutePath(), rpmFileName,mountPath);
 
         // 读取整个文件
         StringBuilder content = new StringBuilder();
@@ -141,7 +139,7 @@ public class DatabaseInstaller {
                     // 替换为新的包名
                     line = "g_database_rpm_file=\"" + rpmFileName + "\"";
                 } else if (line.startsWith("g_database_data=")) {
-                    // 替换为新的ivory数据目录
+                    // 更新数据库的数据目录
                     line = "g_database_data=\"" + mountPath + "\"";
                 }
                 content.append(line).append(System.lineSeparator());
@@ -229,3 +227,4 @@ public class DatabaseInstaller {
 
 
 }
+

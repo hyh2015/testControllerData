@@ -7,7 +7,7 @@ import java.io.InputStreamReader;
 public class CheckDatabaseInstall {
 
     // 目前只支持ivory数据库安装
-    private final static String dbName="ivorysql";
+    private final static String ivorysql="ivorysql";
 
     /**
      * 对外提供的公共方法
@@ -15,30 +15,17 @@ public class CheckDatabaseInstall {
      * @return true 表示数据库已存在或安装成功；false 表示安装失败
      */
     public void checkAndInstallDatabase() {
-        boolean installed = checkDatabaseInstalled(dbName);
+        boolean installed = checkDatabaseInstalled(ivorysql);
 
         if (!installed) {
-            System.out.println("未检测到数据库 [" + dbName + "]，开始执行安装流程...");
+            System.out.println("==============未检测到数据库 [" + ivorysql + "]，开始执行安装流程...==============");
             DatabaseInstaller installer = new DatabaseInstaller();
-            installer.installDatabase(dbName);
+            installer.installDatabase(ivorysql);
         } else {
-            System.out.println("数据库 [" + dbName + "] 已安装，无需重复安装。");
+            System.out.println("==============数据库 [" + ivorysql + "] 已安装，无需重复安装==============");
         }
     }
 
-/*    public static void main(String[] args) {
-        // 如果没传参数，默认检测 ivorysql
-        String dbName = args.length > 0 ? args[0] : "ivorysql";
-        boolean installed = checkDatabaseInstalled(dbName);
-
-        if (!installed) {
-            System.out.println("未检测到数据库 [" + dbName + "]，开始执行安装流程...");
-            DatabaseInstaller installer = new DatabaseInstaller();
-            installer.installDatabase(dbName);
-        } else {
-            System.out.println("数据库 [" + dbName + "] 已安装，无需重复安装。");
-        }
-    }*/
 
     /**
      * 检查数据库是否已安装
@@ -71,3 +58,4 @@ public class CheckDatabaseInstall {
         }
     }
 }
+

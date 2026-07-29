@@ -46,6 +46,13 @@ public class PartitionIndexCreator {
         }
     }
 
+    /**
+     * ivory或pg使用匿名块创建分区
+     * @param tableName
+     * @param colName
+     * @param indexName
+     * @return
+     */
     private static String buildAnonymousBlock(String tableName, String colName, String indexName) {
         return "DO $$\n" +
                 "DECLARE\n" +
@@ -63,14 +70,14 @@ public class PartitionIndexCreator {
 
 
     /**
-     *  数据库 HIGHGO | VASTBASE | ORACLE 创建分区索引
+     *  数据库 HIGHGO | VASTBASE | ORACLE | KINGBASE 创建分区索引
      * @param conn
      * @param tableName
      * @param indexFields
      * @param indexNames
      * @param dbType
      */
-    public static void createPartitionIndexesHgVb(Connection conn, String tableName, List<String> indexFields, List<String> indexNames, String dbType) {
+    public static void createPartitionIndexesOnTable(Connection conn, String tableName, List<String> indexFields, List<String> indexNames, String dbType) {
 
         if (indexFields.size() != indexNames.size()) {
             throw new IllegalArgumentException("字段名与索引名数量不一致");
@@ -146,4 +153,5 @@ public class PartitionIndexCreator {
     }
 
 }
+
 

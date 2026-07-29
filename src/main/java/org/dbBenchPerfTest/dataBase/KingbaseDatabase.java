@@ -8,37 +8,43 @@ import org.testController.DbManager;
 import org.testController.JavaProcessExecutor;
 import org.testController.PartitionIndexCreator;
 
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-public class VastbaseDatabase implements DatabaseInface {
 
-    private static final Logger logger = LoggerFactory.getLogger(VastbaseDatabase.class);
+/**
+ *  准备数据表
+ */
+public class KingbaseDatabase implements DatabaseInface {
+
+
+    private static final Logger logger = LoggerFactory.getLogger(KingbaseDatabase.class);
 
     private final TestConfig config;
-    private final String dataType="VASTBASE";
 
-    public VastbaseDatabase(TestConfig config) {
+    private final String dataType = "KINGBASE";
+
+
+    public KingbaseDatabase(TestConfig config) {
         this.config = config;
     }
 
 
     @Override
-    public void createPartitionTable() {
+    public void createPartitionTable() throws SQLException {
+
         logger.info("[预处理] "+dataType+" 数据库开始创建分区表...");
 
         String partTableName = config.getPartTableName();
 
         String  createTableSql = "CREATE TABLE IF NOT EXISTS " + partTableName + " ("
-                + "begintime date," + "usernum text," + "imei text," + "calltype text," + "netid text," + "lai text," +
+                + "begintime text," + "usernum text," + "imei text," + "calltype text," + "netid text," + "lai text," +
                 "ci text," + "imsi text," + "start_time text," + "end_time text," + "longitude text," + "latitude text," +
                 "lacci text," + "timespan text," + "extra_longitude text," + "extra_latitude text," + "geospan text," +
                 "anchorhash text," + "extra_geohash text," + "bd text," + "ad text," + "user_id text," + "address text," +
@@ -46,33 +52,56 @@ public class VastbaseDatabase implements DatabaseInface {
                 "ipv6 text," + "mission_id text," + "bankcard_id text"
                 + ") ";
 
-        StringBuilder partitionSql = new StringBuilder(createTableSql);
-        partitionSql.append("PARTITION BY RANGE (begintime) (");
 
-        LocalDate current = config.getPartStartDate();
-        while (current.isBefore(config.getPartEndDate())) {
-            String partitionName = partTableName + "_p" + current.format(DateTimeFormatter.BASIC_ISO_DATE);
-            String valueLessThan = current.plusDays(1).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-            partitionSql.append("PARTITION ").append(partitionName)
-                    .append(" VALUES LESS THAN (TO_DATE('").append(valueLessThan).append("','YYYYMMDD')),");
-            current = current.plusDays(1);
-        }
-        partitionSql.setLength(partitionSql.length() - 1);
-        partitionSql.append(")");
-        logger.info(dataType+" 数据库开始执行创建分区表："+partTableName);
+        createTableSql += "PARTITION BY RANGE (begintime)";
+        logger.info(dataType+" 数据库开始创建分区表基表："+partTableName);
+
         try(Connection connec = DbManager.getConnection(config.getDbType());
             Statement stmt = connec.createStatement()) {
-            stmt.execute(partitionSql.toString());
-        } catch (SQLException e) {
-            logger.error(dataType+" 数据库创建分区表失败");
-            throw new RuntimeException(e);
+            stmt.execute(createTableSql);
+
+            logger.info(dataType+" 数据库的分区表："+partTableName+"基表创建成功");
+
+            LocalDate partStartDate = config.getPartStartDate();
+            LocalDate partEndDate = config.getPartEndDate();
+
+            String doSql = String.format(
+                    "DO $$\n" +
+                            "DECLARE\n" +
+                            "    start_date DATE := DATE '%s';\n" +
+                            "    end_date DATE := DATE '%s';\n" +
+                            "    partition_name TEXT;\n" +
+                            "    table_name TEXT := '%s';\n" +
+                            "BEGIN\n" +
+                            "    WHILE start_date < end_date LOOP\n" +
+                            "        partition_name := format('%%I_p%%s', table_name, to_char(start_date, 'YYYYMMDD'));\n" +
+                            "        IF NOT EXISTS (\n" +
+                            "            SELECT 1 FROM pg_catalog.pg_tables WHERE tablename = partition_name\n" +
+                            "        ) THEN\n" +
+                            "            EXECUTE format(\n" +
+                            "                'CREATE TABLE IF NOT EXISTS %%I PARTITION OF %%I FOR VALUES FROM (%%L::DATE) TO (%%L::DATE);',\n" +
+                            "                partition_name,\n" +
+                            "                table_name,\n" +
+                            "                start_date,\n" +
+                            "                start_date + INTERVAL '1 day'\n" +
+                            "            );\n" +
+                            "        END IF;\n" +
+                            "        start_date := start_date + INTERVAL '1 day';\n" +
+                            "    END LOOP;\n" +
+                            "END\n" +
+                            "$$;"
+                    , partStartDate, partEndDate, partTableName);
+            // 执行匿名块
+            logger.info(dataType + " 数据库的分区表："+partTableName +"，执行匿名块创建分区");
+            stmt.execute(doSql);
+            logger.info(dataType + " 数据库的分区表，匿名块执行创建分区成功");
         }
-        logger.info(dataType+" 数据库创建分区表："+partTableName+"成功");
+
     }
 
     @Override
-    public void copyData() throws IOException {
-        logger.info(dataType+" 数据库 批量入库...执行 COPY STDIN ");
+    public void copyData() {
+        logger.info(dataType + " 数据库 批量入库...执行 COPY STDIN ");
 
         String insertIntoJar = config.getInsertIntoJar();
         String l2oProperties = config.getL2oProperties();
@@ -108,6 +137,5 @@ public class VastbaseDatabase implements DatabaseInface {
 
         PartitionIndexCreator.createPartitionIndexesOnTable(config.getConn(), partTableName, indexFields, indexNames, config.getDbType());
     }
-
 }
 

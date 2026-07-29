@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
+// todo 暂时不支持pg数据库测试
 public class PostgresDatabase implements DatabaseInface {
 
     private static final Logger logger = LoggerFactory.getLogger(PostgresDatabase.class);

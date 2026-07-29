@@ -1,12 +1,12 @@
 package org.testController;
 
+import org.dbBenchPerfTest.scenarios.SceneExecutorNew;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,7 +16,7 @@ import java.util.Properties;
 
 public class UpdateConfProperties {
     private static final Logger logger = LoggerFactory.getLogger(UpdateConfProperties.class);
-    private static SceneExecutor executor = new SceneExecutor(DbManager.getProperty("db.type"));
+    private static final SceneExecutorNew executor = new SceneExecutorNew(DbManager.getProperty("db.type"));
 
     /**
      * 通用更新l2o.properties配置文件的方法
@@ -61,7 +61,7 @@ public class UpdateConfProperties {
 
         logger.info("[配置更新] l2o.properties 更新成功 ");
         // TODO 显示输出所有配置项
-        logger.info("======================l2o.properties=======================");
+        logger.info(">>>>>>>>>>>>>>>>>> l2o.properties start <<<<<<<<<<<<<<<<<<");
 
         try (InputStream inCheck = Files.newInputStream(l2oPath)) {
             Properties checkProps = new Properties();
@@ -75,7 +75,7 @@ public class UpdateConfProperties {
             logger.error("[配置校验] 读取 l2o.properties 文件失败", e);
         }
 
-        logger.info("======================l2o.properties end=====================");
+        logger.info(">>>>>>>>>>>>>>>>>> l2o.properties end <<<<<<<<<<<<<<<<<<");
 
         return true;
 
@@ -114,7 +114,7 @@ public class UpdateConfProperties {
 
         logger.info("[配置更新] config.properties 更新成功，query.type = " + queryType);
         // TODO 显示输出所有配置项
-        logger.info("======================config.properties=======================");
+        logger.info(">>>>>>>>>>>>>>>>>> config.properties start <<<<<<<<<<<<<<<<<<");
 
         try (InputStream inCheck = Files.newInputStream(configPath)) {
             Properties checkProps = new Properties();
@@ -128,7 +128,7 @@ public class UpdateConfProperties {
             logger.error("[配置校验] 读取 config.properties 文件失败", e);
         }
 
-        logger.info("======================config.properties end=====================");
+        logger.info(">>>>>>>>>>>>>>>>>> config.properties end <<<<<<<<<<<<<<<<<<");
 
         return true;
     }
@@ -162,7 +162,7 @@ public class UpdateConfProperties {
 
         logger.info("[配置更新] config.properties 更新成功，query.type = " + recordTableNum);
         // TODO 显示输出所有配置项
-        logger.info("======================config.properties=======================");
+        logger.info(">>>>>>>>>>>>>>>>>> config.properties start <<<<<<<<<<<<<<<<<<");
 
         try (InputStream inCheck = Files.newInputStream(configPath)) {
             Properties checkProps = new Properties();
@@ -176,11 +176,12 @@ public class UpdateConfProperties {
             logger.error("[配置校验] 读取 config.properties 文件失败", e);
         }
 
-        logger.info("======================config.properties end=====================");
+        logger.info(">>>>>>>>>>>>>>>>>> config.properties end <<<<<<<<<<<<<<<<<<");
 
         return true;
     }
 
 
 }
+
 

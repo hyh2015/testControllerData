@@ -33,7 +33,7 @@ public class Scenario5 implements Scenario {
         logger.info("[场景5] 启动 iostat 和 dstat 监控成功，间隔: " + monitorInterval + "s");
         MonitorIOUtils.MonitorProcesses monitors = MonitorIOUtils.startIOstatDstatOutput(scenario5,monitorInterval,"binfa");
 
-        logger.info("[场景5] 开始执行：并发执行场景3和场景4");
+        logger.info("[场景5] >>> 开始执行");
         String Scenario5 = "Scenario5";
         String insertTableEvt = config.getInsertTableEvt();
         String recordTable1 = config.getRecordTable1();
@@ -47,20 +47,19 @@ public class Scenario5 implements Scenario {
         PrepareSecnarioEnvironment.prepareScenario5Environment(config.getConn(), insertTableEvt, recordTable1, dbType);
 
 
-
-//        3. 并发执行
+//        3. 并发执行h
         ExecutorService executor = Executors.newFixedThreadPool(2); // 开两个线程
 
         Future<?> future1 = executor.submit(() -> {
             try {
                 // 场景3：并发随机读  100并发读
 //                int timeHour = Integer.parseInt(DbManager.getProperty("timeout.binfa.hour"));
-                logger.info(">>>并发任务1（随机读：100个并发）");
+                logger.info(">>> 并发任务1启动...（随机读：100个并发）");
                 String logFile = Scenario5 + "_100read_out_" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".log";
 
                 JavaProcessExecutor.executeJavaProcess(tableMigJar,configProperties,0,logFile);
             } catch (Exception e) {
-                logger.warn("任务1执行被中断或捕获到异常：" + e.getMessage());
+                logger.error("并发任务1（随机读）被正常中断或执行异常", e.getMessage());
             } finally {
                 logger.info("任务1线程已退出。");
             }
@@ -70,39 +69,34 @@ public class Scenario5 implements Scenario {
             try {
                 //场景4：逐条入库
                 String fileNum = DbManager.getProperty("binfaInsert.file.num");
-                logger.info(">>>并发任务2（逐条入库：执行入库 "+fileNum+"个文件）");
+                logger.info(">>> 并发任务2启动...（逐条入库：执行入库 "+fileNum+"个文件）");
                 long startTime = System.currentTimeMillis();
                 String logFile = Scenario5 + "_insert"+fileNum+"File_out_" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".log";
 
                 JavaProcessExecutor.executeJavaProcess(insertIntoJar, l2oProperties, 0, logFile);
+
                 long endTime = System.currentTimeMillis();
                 logger.info("入库完成，耗时：" + ((endTime - startTime) / 1000.0) + " 秒");
             } catch (Exception e) {
-                logger.error("并发任务2执行失败", e);
+                logger.error("并发任务2（逐条入库）执行失败", e);
                 throw e; // 抛出异常以便主线程感知
             }
         });
 
-//        4. 并发控制核心逻辑
+//        4.并发控制核心（可设置最大等待时间）
         try {
             future2.get();
             logger.info("[控制台] 检测到任务2已完成，现在开始强制终止任务1...");
-            if (!executor.awaitTermination(24, TimeUnit.HOURS)) {
-                executor.shutdownNow();
-                logger.warn("并发执行时间超过：24h");
-            } else {
-                logger.info("[场景5] 所有并发任务执行完成");
-            }
+        } catch (Exception e ){
+            logger.error("[控制台] 运行过程中出现错误：" + e.getMessage());
         } finally {
-            // 关键一步：立即关闭线程池并向所有任务发送 interrupt() 信号
-            // 任务1收到信号后，JavaProcessExecutor 应负责销毁对应的系统进程
             executor.shutdownNow();
 
             try {
                 if (!executor.awaitTermination(24, TimeUnit.HOURS)) {
-                    logger.warn("[场景5] 任务在 24h 内未完全退出，强制继续后续清理工作");
+                    logger.warn("[场景5] 并发执行时间超过24h，强制继续后续清理工作。");
                 }
-            } catch (InterruptedException ie) {
+            }catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
             }
         }
@@ -111,13 +105,13 @@ public class Scenario5 implements Scenario {
         MonitorIOUtils.stopMonitoring(monitors);
         logger.info("[场景5] 停止性能监控进程完成");
 
-//        6.获取部分指标信息
+//        6.获取部分指标信息并清理连接
         RecordTableSelector.recordTableSqlList(config.getConn(), recordTable1);
         config.getConn().close();
 
-        logger.info("[场景5] 执行完毕，场景5结束");
-
+        logger.info("[场景5] 测试流程结束");
 
     }
 }
+
 
