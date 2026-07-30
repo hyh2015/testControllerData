@@ -130,7 +130,8 @@ GBbase8s.readAndinsert.enabled=false
 
 ```
 Start.main()
-  ├─ 若 db.type=ivory 且 is.install.ivory=true → CheckDatabaseInstall（rpm 检测 + 自动装库）
+  ├─ is.install.ivory=true 时：db.type 必须是 ivory，否则直接抛 IllegalStateException 终止；
+  │  是 ivory 则走 CheckDatabaseInstall（rpm 检测 + 自动装库）
   ├─ CheckHardware.checkStorageHealth()   ← 硬盘/RAID 预检，不通过则 System.exit(1)
   └─ TestControllerNew(new TestConfig(dbType)).runAllTests()
        ├─ DatabaseFactory.getDatabase(config) → DatabaseInface 实现
@@ -209,8 +210,11 @@ Scenario3 依赖 Scenario2 产出的 `tb_usernum_list1`（会被 rename 成 `tb_
 - **仓库没有 log4j2 配置**（`src/main/resources` 下只有 `MANIFEST.MF`），日志配置需由部署目录提供。
 - **类名拼写错误**：`PrepareSecnarioEnvironment`、`GBaseRandomReadSecnario`、
   `GBaseReadAndInsertSecnario` 里是 `Secnario` 而非 `Scenario`，搜索时注意。
-- **`Mockdata.waitForVaildFiles` 的超时判断无效**：`countTimes > timeOut` 只在进入 `while` 前
-  判断一次，循环内部不再检查，实际是无限轮询。
+- **`Mockdata.waitForVaildFiles` 会一直阻塞到数据文件齐备 —— 这是有意设计**：
+  每 30s 跑一次 `find` 校验目录下是否已有 `mockdata.file.num` 个 >4080MB 的文件，
+  不满足就继续等。造数据本身耗时很长，所以不设上限。
+  注意方法内的 `timeOut`（6h）和 `countTimes` 是**未生效的残留变量**
+  —— 判断写在 `while` 之外、只执行一次，别误以为 6 小时后会自动返回。
 - **`SceneExecutorNew` 与 `TestConfig` 字段重复**（前者少一个 `Connection`）。
   `UpdateConfProperties` 用前者取连接信息。改连接相关字段时两边都要动。
 - 日志文件名（含 `iostat`/`dstat` 采集结果）直接写在 CWD，形如

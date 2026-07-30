@@ -21,10 +21,12 @@ public class Start {
         /**
          * 判断是否安装ivorysql数据库
          */
-        if(dbType.equalsIgnoreCase("ivory") && DbManager.isEnabled("is.install.ivory")){
+        if (DbManager.isEnabled("is.install.ivory")) {
+            if (!dbType.equalsIgnoreCase("ivory")) {
+                throw new IllegalStateException(
+                        "只支持安装 ivory 数据库，暂不支持安装其他类型数据库。当前 db.type=" + dbType);
+            }
             new CheckDatabaseInstall().checkAndInstallDatabase();
-        } else if (!dbType.equalsIgnoreCase("ivory") && DbManager.isEnabled("is.install.ivory")) {
-            logger.error("只支持安装 ivory 数据库，暂不支持安装其他类型数据库");
         }
 
         /**
