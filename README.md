@@ -79,6 +79,24 @@ yum install -y sysstat dstat expect
 
 这是**唯一**需要手工修改的配置文件。也可用 `-Dconf=/path/to/xxx.properties` 指定其它路径。
 
+> ### ⚠️ 配置的键名与值必须使用纯 ASCII 字符
+>
+> **不要在配置值里写中文**（也不要写全角标点、带音标的字母等任何非 ASCII 字符），
+> 尤其是 `data.path`、`partition.table_name`、`insert.tablename`
+> 以及各数据库的 `user` / `password` / `database` / `url`。
+>
+> 原因是整条配置链路的解码方式不一致：控制器把 `allconf.properties` 的部分值
+> 转写进 `l2o.properties` / `config.properties`，写出时用 UTF-8，
+> 而真正消费这两个文件的 `tableMigration.jar`（`PropertyManager`）和
+> `InsertIntoOracle.jar`（`PropertiesUtil`）都使用 `Properties.load(InputStream)`
+> ——该方法按 Java 规范**固定以 ISO-8859-1 解码**。非 ASCII 值会在这一步被曲解，
+> 表现为找不到目录、连不上库或表名不匹配，且不一定有明确报错。
+>
+> **注释不受影响**（解析时会被跳过），但本文件的注释同样建议用英文书写：
+> IDE 对 `.properties` 的默认编码通常也是 ISO-8859-1，中文注释会显示为乱码。
+>
+> 只要坚持全 ASCII，上述解码差异不会造成任何问题。
+
 ### 3.1 必改项
 
 ```properties
