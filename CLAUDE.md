@@ -132,7 +132,8 @@ GBbase8s.readAndinsert.enabled=false
 Start.main()
   ├─ is.install.ivory=true 时：db.type 必须是 ivory，否则直接抛 IllegalStateException 终止；
   │  是 ivory 则走 CheckDatabaseInstall（rpm 检测 + 自动装库）
-  ├─ CheckHardware.checkStorageHealth()   ← 硬盘/RAID 预检，不通过则 System.exit(1)
+  ├─ hardware.check.enabled=true（缺省）时：CheckHardware.checkStorageHealth()
+  │  ← 硬盘/RAID 预检，storcli 不可用或检出异常均不通过，System.exit(1)
   └─ TestControllerNew(new TestConfig(dbType)).runAllTests()
        ├─ DatabaseFactory.getDatabase(config) → DatabaseInface 实现
        └─ 按 scene*.enabled 开关逐个 new ScenarioN(config).run(db)
@@ -202,9 +203,9 @@ Scenario3 依赖 Scenario2 产出的 `tb_usernum_list1`（会被 rename 成 `tb_
 - **`DatabaseInface` 只覆盖 3 个操作**（`createPartitionTable` / `copyData` / `createPartIndexes`）。
   场景 2/4/5 对应的接口方法在源码里是注释状态，这些场景直接调 `org.testController.*`
   的静态工具类，绕过了策略体系。
-- **`CheckHardware` 是 fail-open（已知，待修）**：`storcli64` 缺失或路径不对时 `execute()`
-  返回错误提示字符串，不含任何异常关键字，预检因此判定为「通过」。
-  另：`checkStorageHealth()` 是 `static`，却用 `new CheckHardware().checkStorageHealth()` 调用。
+- **`CheckHardware` 是 fail-closed**：`storcli64`（路径硬编码 `/opt/MegaRAID/storcli/storcli64`）
+  不可执行、执行失败或退出码非 0 时预检一律不通过 —— 「没检成」不等于「检查通过」。
+  非 MegaRAID 机器需用 `hardware.check.enabled=false` 跳过，否则程序启动即退出。
 - **SQL 全部字符串拼接**，表名来自配置。这是内网压测工具的既有形态，改动时保持一致即可，
   但不要把外部不可信输入接进来。
 - **仓库没有 log4j2 配置**（`src/main/resources` 下只有 `MANIFEST.MF`），日志配置需由部署目录提供。

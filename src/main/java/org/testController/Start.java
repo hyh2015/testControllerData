@@ -31,18 +31,23 @@ public class Start {
 
         /**
          * 判断服务器硬盘是否正常
+         * 非 MegaRAID 机器（无 storcli）可将 hardware.check.enabled 置为 false 跳过
          */
-        if (!new CheckHardware().checkStorageHealth()) {
-            logger.error("由于服务器硬盘状态异常，为保证压测数据准确性，程序已经自动终止。");
-            System.exit(1); //强制退出
+        if (DbManager.isEnabled("hardware.check.enabled")) {
+            if (!new CheckHardware().checkStorageHealth()) {
+                logger.error("由于服务器硬盘状态异常，为保证压测数据准确性，程序已经自动终止。");
+                System.exit(1); //强制退出
+            }
         } else {
-
-            logger.info("==== 开始测试数据库: " + dbType + " ====\n");
-//        TestController controller = new TestController(dbType);
-            TestControllerNew controller = new TestControllerNew(new TestConfig(dbType));
-            controller.runAllTests();
-            logger.info("==== 完成数据库: " + dbType + " ====\n");
+            logger.warn("已配置 hardware.check.enabled=false，跳过硬盘预检。"
+                    + "磁盘若存在坏盘或 Raid 降级将无法被发现，压测数据可能失真。");
         }
+
+        logger.info("==== 开始测试数据库: " + dbType + " ====\n");
+//        TestController controller = new TestController(dbType);
+        TestControllerNew controller = new TestControllerNew(new TestConfig(dbType));
+        controller.runAllTests();
+        logger.info("==== 完成数据库: " + dbType + " ====\n");
 
     }
 

@@ -17,7 +17,7 @@
 | 工具 | 用途 | 缺失后果 |
 |---|---|---|
 | **JDK 8** | 运行主程序与各压测 jar | 无法运行 |
-| **storcli** | 磁盘/RAID 健康预检 | **压测直接终止**，见下方说明 |
+| **storcli** | 磁盘/RAID 健康预检 | **压测直接终止**，可关闭，见下方说明 |
 | `iostat`（sysstat） | IO 指标采集 | 采集进程起不来 |
 | `dstat` | 系统资源采集 | 同上 |
 | `timeout`（coreutils） | 限时执行并发读程序 | 场景 3/5 无法限时 |
@@ -27,11 +27,14 @@
 yum install -y sysstat dstat expect
 ```
 
-> ⚠️ **storcli 是硬性前置条件。** 程序启动时执行磁盘预检，
+> ⚠️ **默认情况下 storcli 是硬性前置条件。** 程序启动时执行磁盘预检，
 > 若 storcli 未安装、路径不是 `/opt/MegaRAID/storcli/storcli64`、无执行权限或退出码非 0，
 > 预检一律判定不通过，程序 `System.exit(1)` 终止。
 > 这是有意设计：无法确认磁盘状态时，压测数据不具备参考价值。
-> 非 MegaRAID 机器需要先调整 `CheckHardware.STORCLI_PATH` 或改造该预检逻辑。
+>
+> **非 MegaRAID 机器**（云主机、软 RAID 等）在 `allconf.properties` 中置
+> `hardware.check.enabled=false` 即可跳过整个预检。跳过后磁盘坏盘或 Raid 降级
+> 将无法被发现，启动日志会打出一条 WARN 提示。
 
 ### 1.2 磁盘容量
 
@@ -91,6 +94,9 @@ ivory.database=ivorysql
 
 # 测试数据文件存放路径，必须在已挂载的数据盘下（约需 1.5TB）
 data.path=/已挂载磁盘目录/TestControllerData/datafile
+
+# 硬盘/Raid 预检开关，缺省 true；非 MegaRAID 机器置 false 跳过
+hardware.check.enabled=true
 ```
 
 > 新增数据库类型时，`{db.type}.driver` / `.url` / `.host` / `.port` / `.user` /
@@ -211,7 +217,8 @@ yum install -y expect
 查看 `nohup.out` 中 `[硬盘预检]` 开头的记录：
 
 - 提示「未找到可执行的 storcli」→ 安装 storcli，或确认路径为
-  `/opt/MegaRAID/storcli/storcli64` 且有执行权限
+  `/opt/MegaRAID/storcli/storcli64` 且有执行权限；
+  非 MegaRAID 机器可置 `hardware.check.enabled=false` 跳过预检
 - 提示「检测到硬盘硬件异常」→ 存在坏盘或 RAID 降级，需先修复硬件，
   详细状态见日志中的 VD / PD 报告
 
