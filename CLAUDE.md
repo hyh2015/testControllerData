@@ -14,47 +14,63 @@ IvorySQL、HighGo、Vastbase、Kingbase、GBase 8s、原生 PG。
 3. 在每个阶段前后启停 `iostat` / `dstat` 采集 IO 指标；
 4. 结束后查询数据库里的 record 表，算出 avgreturn / avgfinish / 100r-sec 等指标并打日志。
 
-外部 jar（**不由本仓库构建**，是黑盒依赖）：
+被调度的程序（**源码不在本仓库**，以构建产物形式消费）：
 
-| Jar | 职责 | 读取的配置 |
-|---|---|---|
-| `tableMigration.jar` | 并发随机读 | `config.properties` |
-| `InsertIntoOracle.jar` | 批量 COPY / 逐条 insert 入库 | `l2o.properties` |
-| `mockdata.jar` | 生成测试数据文件 | 命令行参数 `-T日期 -D目录 -N天数` |
+| 程序 | 主类 | 职责 | 读取的配置 | 交付形式 |
+|---|---|---|---|---|
+| tableMigration | `com.test.Test` | 并发随机读 | `config.properties` | 打进本 fat jar |
+| InsertIntoOracle | `com.s1.l2o.Start` | 批量 COPY / 逐条 insert 入库 | `l2o.properties` | 打进本 fat jar |
+| mockdata | `com.s1.mock.MockData` | 生成测试数据文件 | 命令行参数 `-T日期 -D目录 -N天数` | 独立 `mockdata.jar` |
 
-控制器与这些 jar 之间**唯一的契约就是 properties 文件的键名**。改 `UpdateConfProperties`
-的写入逻辑时，必须保证键名与目标 jar 的期望一致 —— 编译期无法校验。
+前两个已随本项目打进同一个 fat jar，因此 `TestConfig` 里存的是**主类名**而非 jar 文件名，
+由 `JavaProcessExecutor` 以 `java -cp <自身jar> <主类>` 自调用拉起。
+
+**仍然走子进程而不是直接方法调用**，是因为这两个程序依赖进程边界：
+
+- 配置读在静态初始化块（`PropertiesUtil`）/ 单例构造函数（`PropertyManager`）里，每个 JVM 只读一次；
+  而调度器每个场景前都会重写这两个 properties，同进程复用会让第二个场景之后静默沿用旧配置。
+- 随机读的 `TestThread1~6` 是 `while(true)` 且把 `catch` 写在循环体**内部**，中断异常会被吞掉，
+  只能靠杀进程停下 —— 场景 3 靠 `timeout N`，场景 5 靠 `shutdownNow()` 触发
+  `InterruptedException` 再 `destroyForcibly()`。
+
+控制器与这些程序之间**唯一的契约就是 properties 文件的键名**。改 `UpdateConfProperties`
+的写入逻辑时，必须保证键名与目标程序的期望一致 —— 编译期无法校验。
+另外它们都**忽略命令行传入的配置文件名**，只认当前工作目录下的固定文件名。
 
 ## Build & Run
 
 ### Build
 
-**不要用 Maven 构建。** `pom.xml` 未声明任何依赖（只设了 source/target 8 和编码），
-而代码依赖 slf4j / log4j2 / 各家 JDBC 驱动，`mvn compile` 必然失败。
+用 Maven 构建，产出单个 fat jar。项目自带 Maven Wrapper，构建机只需 JDK 8 或 11
+（`source/target=8`，产物为 Java 8 字节码，在 8 与 11 上都能跑）：
 
-实际构建走 IntelliJ artifact：`.idea/artifacts/TestControllerData_jar.xml`
-（Build → Build Artifacts → `TestControllerData:jar`），产物在 `out/artifacts/TestControllerData_jar/`。
-它把模块输出打成 `TestControllerData.jar`，再把**项目库 `libDBB`** 的全部 jar 释放到同级目录
-（`<element id="library" level="project" name="libDBB" />`）。
+```bash
+./install-libs.sh          # libDBB 不在 ../libDBB 时用 LIB_DIR=... 指定
+./mvnw clean package       # 产物：target/TestControllerData.jar（约 22 MB）
+```
+
+`install-libs.sh` 把 `../libDBB/` 下的 20 个 jar 用 `install:install-file` 灌进**项目内**的
+Maven 文件仓库 `lib-repo/`（已 gitignore）。装在项目内而非 `~/.m2`，是为了不覆盖机器上
+其他项目在用的同名构件；灌完之后构建完全离线。
 
 ⚠️ **依赖的真实来源是兄弟目录 `../libDBB/`，不是仓库内的 `lib/`。**
 `lib/` 是一份过期快照（缺 `kingbase8-8.6.0.jar`、`tableMigration.jar`），不参与构建。
 
-新增依赖：把 jar 放进 `../libDBB/` → 加入 IntelliJ 项目库 `libDBB` → 在
-`MANIFEST.MF` 的 `Class-Path` 里加文件名。artifact 侧不必再逐个登记（早期版本是
-20 条 file-copy，现已改为整库引用）。**`Class-Path` 这步不能漏**，否则
-`Class.forName()` 加载驱动时抛 `ClassNotFoundException`。
+新增依赖：把 jar 放进 `../libDBB/` → 在 `install-libs.sh` 的 `ARTIFACTS` 表里加一行 →
+在 `pom.xml` 里加 `<dependency>`。
 
-⚠️ **项目库定义 `.idea/libraries/libDBB.xml` 被 `.gitignore` 忽略**（`.gitignore:10`
-的 `.idea/libraries/`）。全新 clone 拿不到它，artifact 会因找不到 `libDBB` 库而构建失败 ——
-需要在 IntelliJ 里重建该项目库并指向 `../libDBB/`。
+⚠️ **`pom.xml` 里 JDBC 驱动的声明顺序不可随意调整。** Vastbase 和 HGDB 的驱动都是
+PostgreSQL 驱动的分支，与 `postgresql` 存在同名类（分别重叠 298 个和 13 个），
+fat jar 里同名类只能活一份，由声明顺序决定。现在让 `postgresql` 排最前，
+与改造前三个 MANIFEST 的 `Class-Path` 顺序一致（那时也是 PG 副本胜出）。详见 pom 内注释。
 
-`src/main/resources/META-INF/MANIFEST.MF` 的 `Main-Class` 是 `org.testController.Start`，
-`Class-Path` 用**裸文件名**，因此依赖 jar 必须与主 jar 同目录平铺。
+shade 配置中两处不能删：`ServicesResourceTransformer`（12 个依赖带
+`META-INF/services/`，不合并会让 slf4j / log4j2 的 Provider 被覆盖、日志静默失效）、
+以及对两个程序包 `log4j2.xml` 的排除（同名互相覆盖，改由本项目提供三份配置）。
 
 ### Run
 
-必须在**同时包含主 jar、全部依赖 jar 和 properties 文件**的部署目录下运行：
+必须在**包含 `allconf.properties` 的部署目录**下运行（`mockdata.jar` 按需同放）：
 
 ```bash
 java -jar TestControllerData.jar
@@ -69,7 +85,9 @@ java -Dconf=/path/to/allconf.properties -jar TestControllerData.jar
 **运行环境要求 Linux。** 代码直接 shell 调用 `bash`、`iostat`、`dstat`、`timeout`、
 `chmod`、`rpm`、`ss`、`uname`、`find`，以及 `/opt/MegaRAID/storcli/storcli64`。
 
-**CWD 极其敏感**：所有 jar 名、配置文件名、`mock.sh`、输出日志都按裸文件名相对当前工作目录解析。
+**CWD 极其敏感**：配置文件名、`mock.sh`、输出日志都按裸文件名相对当前工作目录解析。
+自调用的子进程继承父进程的工作目录（`ProcessBuilder` 默认行为），因此它们也在同一目录下
+找 `config.properties` / `l2o.properties`。
 
 ### Tests
 
@@ -119,7 +137,7 @@ GBbase8s.readAndinsert.enabled=false
 
 这两个文件在每次场景运行时被 `UpdateConfProperties` **整体覆盖重写**：
 
-- `updateConcurrentInsertConfig(...)` → 重写 `l2o.properties`（喂给 `InsertIntoOracle.jar`），
+- `updateConcurrentInsertConfig(...)` → 重写 `l2o.properties`（喂给入库程序 `com.s1.l2o.Start`），
   用 `db.bulkload` 区分 COPY（true）和逐条 insert（false）
 - `updateConcurrentReadConfig(queryType)` → 重写 `config.properties`，`MaxThread` **硬编码 100**
 - `updateReadConfig(queryType, maxThread)` → 同上，但并发数可传
@@ -132,6 +150,8 @@ GBbase8s.readAndinsert.enabled=false
 Start.main()
   ├─ is.install.ivory=true 时：db.type 必须是 ivory，否则直接抛 IllegalStateException 终止；
   │  是 ivory 则走 CheckDatabaseInstall（rpm 检测 + 自动装库）
+  │  ← 装库为 fail-fast：架构未知/包名未配置/脚本改写失败/安装未出成功标记/
+  │     装完状态检查不过，任一不成立都抛 IllegalStateException 终止
   ├─ hardware.check.enabled=true（缺省）时：CheckHardware.checkStorageHealth()
   │  ← 硬盘/RAID 预检，storcli 不可用或检出异常均不通过，System.exit(1)
   └─ TestControllerNew(new TestConfig(dbType)).runAllTests()
@@ -174,12 +194,12 @@ Scenario3 依赖 Scenario2 产出的 `tb_usernum_list1`（会被 rename 成 `tb_
 **装配**（漏掉这两步代码能编译但运行必炸）
 
 4. `allconf.properties` 补一整组 `{dbType}.*` 连接键
-5. 驱动 jar 放入 `../libDBB/` 并加入项目库 `libDBB`，**并**在 `MANIFEST.MF` 的
-   `Class-Path` 里加文件名
+5. 驱动 jar 放入 `../libDBB/`，**并**在 `install-libs.sh` 的 `ARTIFACTS` 表和
+   `pom.xml` 的 `<dependencies>` 里各加一条
 
 > **Kingbase 是完整的参考样例**：`KingbaseDatabase` + `DatabaseFactory` 分支 +
 > `checkTableIsExist` 分支 + `allconf.properties` 的 `kingbase.*` 键 +
-> `libDBB/kingbase8-8.6.0.jar` + `MANIFEST.MF` 的 `Class-Path` —— 五处齐备。
+> `libDBB/kingbase8-8.6.0.jar` + `install-libs.sh` 与 `pom.xml` 的声明 —— 五处齐备。
 > 照着它加新库不容易漏。
 
 各库差异：
@@ -198,8 +218,10 @@ Scenario3 依赖 Scenario2 产出的 `tb_usernum_list1`（会被 rename 成 `tb_
 
 ## 已知限制与陷阱
 
-- **`PostgresDatabase` 三个方法体为空 —— 有意为之，pgdb 类型暂未实现。**
-  `db.type=pgdb` 时建分区表和 Scenario1 批量入库均无操作。
+- **`pgdb`（原生 PG，面向 PG 17）与 `ivory` 共用同一套 DDL 与建索引方式**，
+  因为 IvorySQL 本身是 PG 分支 —— 保持一致两者的压测耗时才可比。
+  建索引特意沿用逐分区方式（`createPartitionIndexesPgIvory`）而非 PG 11+ 的
+  「对主表 CREATE INDEX 自动下推」，后者会在整个建索引期间持有主表 ACCESS EXCLUSIVE 锁。
 - **`DatabaseInface` 只覆盖 3 个操作**（`createPartitionTable` / `copyData` / `createPartIndexes`）。
   场景 2/4/5 对应的接口方法在源码里是注释状态，这些场景直接调 `org.testController.*`
   的静态工具类，绕过了策略体系。
@@ -208,7 +230,13 @@ Scenario3 依赖 Scenario2 产出的 `tb_usernum_list1`（会被 rename 成 `tb_
   非 MegaRAID 机器需用 `hardware.check.enabled=false` 跳过，否则程序启动即退出。
 - **SQL 全部字符串拼接**，表名来自配置。这是内网压测工具的既有形态，改动时保持一致即可，
   但不要把外部不可信输入接进来。
-- **仓库没有 log4j2 配置**（`src/main/resources` 下只有 `MANIFEST.MF`），日志配置需由部署目录提供。
+- **日志配置有三份**（`log4j2.xml` 调度器 / `log4j2-reader.xml` 随机读 / `log4j2-writer.xml` 入库）。
+  三个程序同处一个 fat jar，无法再靠同名 `log4j2.xml` 区分，后两份由 `JavaProcessExecutor`
+  启动子进程时用 `-Dlog4j.configurationFile` 指定。加新的被调度程序时记得同步这张映射表。
+- **ivory 的 rpm 包必须与 `setupivory.sh` 同目录**（即 `scriptPath`），与 jar 部署目录无关。
+  代码从不直接引用 rpm 路径，只把包名写进脚本的 `g_database_rpm_file=`，
+  再以 `scriptPath` 为工作目录执行脚本 —— 裸文件名靠 CWD 解析。
+  包名与 `X86_PACKAGE` / `ARM_PACKAGE` 必须逐字符一致。
 - **类名拼写错误**：`PrepareSecnarioEnvironment`、`GBaseRandomReadSecnario`、
   `GBaseReadAndInsertSecnario` 里是 `Secnario` 而非 `Scenario`，搜索时注意。
 - **`Mockdata.waitForVaildFiles` 会一直阻塞到数据文件齐备 —— 这是有意设计**：
@@ -216,6 +244,9 @@ Scenario3 依赖 Scenario2 产出的 `tb_usernum_list1`（会被 rename 成 `tb_
   不满足就继续等。造数据本身耗时很长，所以不设上限。
   注意方法内的 `timeOut`（6h）和 `countTimes` 是**未生效的残留变量**
   —— 判断写在 `while` 之外、只执行一次，别误以为 6 小时后会自动返回。
+  它返回 `false` 只发生在校验命令本身出错时，不代表「还没造完」。
+- **`mock.sh` 里每条命令都以 `&` 结尾**，脚本把 `mockdata.months` 个 java 进程拉起来就立即退出。
+  所以 `runMockScript()` 返回 true 只说明「启动成功」，真正的产物校验靠 `waitForVaildFiles`。
 - **`SceneExecutorNew` 与 `TestConfig` 字段重复**（前者少一个 `Connection`）。
   `UpdateConfProperties` 用前者取连接信息。改连接相关字段时两边都要动。
 - 日志文件名（含 `iostat`/`dstat` 采集结果）直接写在 CWD，形如
