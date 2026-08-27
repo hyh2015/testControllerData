@@ -26,9 +26,12 @@ public class TestConfig {
     private final String recordTable3 = "tb_test_record_sql3";
     private final String recordTable4 = "tb_test_record_sql4";
 
-    // 依赖的 jar
-    private final String tableMigJar = "tableMigration.jar";
-    private final String insertIntoJar = "InsertIntoOracle.jar";
+    // 被调度的两个程序。它们已随本项目打进同一个 fat jar，不再是独立 jar 文件，
+    // 因此这里存的是主类名，由 JavaProcessExecutor 以 java -cp <自身jar> <主类> 拉起。
+    private final String tableMigJar = "com.test.Test";        // 随机读负载
+    private final String insertIntoJar = "com.s1.l2o.Start";   // 逐条/批量入库负载
+    // mockdata 是自包含 fat jar（内置 logback，与本项目的 log4j2 绑定冲突），
+    // 保持独立交付，仍由生成的 mock.sh 用 java -jar 调用。
     private final String mockdataJar = "mockdata.jar";
 
     // 配置文件

@@ -44,6 +44,8 @@ out/
 # 构建依赖的是兄弟目录 ../libDBB/（IntelliJ 项目库 libDBB），
 # 仓库内的 lib/ 是过期快照，不参与构建
 lib/
+# Maven 文件仓库，由 install-libs.sh 从 ../libDBB/ 生成，不入库
+lib-repo/
 
 ### 运行时生成物 ###
 # config.properties 和 l2o.properties 每次运行由 UpdateConfProperties 整体覆盖重写

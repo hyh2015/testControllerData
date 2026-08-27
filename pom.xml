@@ -14,4 +14,244 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+    <!--
+      依赖全部来自项目内的文件仓库 lib-repo/，由 install-libs.sh 从 libDBB/ 灌入。
+      这么做有两个原因：
+        1. 国产驱动（Vastbase/HGDB/Kingbase/GBase）和两个程序包不在中央仓库；
+        2. 构建不依赖网络，结果可复现。
+      首次构建前先跑一次 ./install-libs.sh。
+    -->
+    <repositories>
+        <repository>
+            <id>project-local</id>
+            <name>项目内文件仓库</name>
+            <url>file://${project.basedir}/lib-repo</url>
+            <releases>
+                <enabled>true</enabled>
+                <checksumPolicy>ignore</checksumPolicy>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <!--
+          两个被调度的程序包，以二进制形式打进 fat jar。
+          源码仍留在各自项目里独立维护，这里只消费构建产物。
+          它们不再作为独立 jar 文件部署，而是通过主类名自调用：
+            com.test.Test        （tableMigration，随机读负载）
+            com.s1.l2o.Start     （InsertIntoOracle，入库负载）
+        -->
+        <dependency>
+            <groupId>local.dbbench</groupId>
+            <artifactId>tableMigration</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>local.dbbench</groupId>
+            <artifactId>InsertIntoOracle</artifactId>
+            <version>1.0</version>
+        </dependency>
+
+        <!--
+          JDBC 驱动。全部走显式 Class.forName 加载，驱动名由 allconf.properties 配置。
+
+          【声明顺序不可随意调整】
+          Vastbase 和 HGDB 的驱动都是 PostgreSQL 驱动的分支，与 postgresql 存在同名类：
+            - vastbase-jdbc 与 postgresql 重叠 298 个 org.postgresql.* 类
+              （allconf 里 vastdata.driver 本来就填的 org.postgresql.Driver）
+            - hgjdbc 与 postgresql 重叠 13 个 org.postgresql.shaded.com.ongres.scram.* 类
+          同名类在 fat jar 里只能活一份，由声明顺序决定 —— 靠前者胜出。
+
+          这里让 postgresql 排在最前，是为了与改造前的行为保持一致：改造前
+          TestControllerData / tableMigration / InsertIntoOracle 三个 MANIFEST 的
+          Class-Path 中，postgresql 也都排在 hgjdbc 与 Vastbase 之前，同样是 PG 副本胜出。
+
+          已知遗留限制（改造前后一致，非本次引入）：HGDB 自带的 SCRAM 实现被 PG 的副本覆盖，
+          若 HGDB 端启用 scram-sha-256 认证可能连接失败，改用 md5 认证可规避。
+        -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.7.5</version>
+        </dependency>
+        <dependency>
+            <groupId>local.dbbench</groupId>
+            <artifactId>hgjdbc</artifactId>
+            <version>6.2.4.build11</version>
+        </dependency>
+        <dependency>
+            <groupId>local.dbbench</groupId>
+            <artifactId>kingbase8</artifactId>
+            <version>8.6.0</version>
+        </dependency>
+        <dependency>
+            <groupId>local.dbbench</groupId>
+            <artifactId>vastbase-jdbc</artifactId>
+            <version>2.9p</version>
+        </dependency>
+        <dependency>
+            <groupId>local.dbbench</groupId>
+            <artifactId>gbasedbtjdbc</artifactId>
+            <version>3.6.5</version>
+        </dependency>
+        <dependency>
+            <groupId>local.dbbench</groupId>
+            <artifactId>h2-driver</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>cn.easyproject</groupId>
+            <artifactId>ojdbc7</artifactId>
+            <version>12.1.0.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>5.1.45</version>
+        </dependency>
+
+        <!-- 日志。tableMigration 用 log4j 1.x API，靠 log4j-1.2-api 桥接到 log4j2。 -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.10</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>2.11.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>2.11.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j-impl</artifactId>
+            <version>2.11.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-1.2-api</artifactId>
+            <version>2.11.0</version>
+        </dependency>
+        <!-- log4j2 异步日志（asyncRoot）依赖 disruptor -->
+        <dependency>
+            <groupId>com.lmax</groupId>
+            <artifactId>disruptor</artifactId>
+            <version>3.3.4</version>
+        </dependency>
+
+        <!-- InsertIntoOracle 直接 import 的工具库 -->
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.4</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.3.2</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>22.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>druid</artifactId>
+            <version>1.1.10</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <!-- 产物固定为 TestControllerData.jar，不带版本号后缀，部署脚本和文档才好写 -->
+        <finalName>TestControllerData</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <source>8</source>
+                    <target>8</target>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.2.4</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <filters>
+                                <!--
+                                  已签名的 jar（ojdbc7 等）把签名文件带进来会触发
+                                  SecurityException: Invalid signature file digest
+                                -->
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>module-info.class</exclude>
+                                    </excludes>
+                                </filter>
+                                <!--
+                                  两个程序包根目录各带一个 log4j2.xml，同名必然互相覆盖。
+                                  统一改由本项目提供 log4j2-reader.xml / log4j2-writer.xml，
+                                  自调用时用 -Dlog4j.configurationFile 指定。
+                                  columnMap.xml / dbsql.xml 是 PropertyManager.loadXml() 的遗留物，
+                                  该方法从未被调用，一并排除。
+                                -->
+                                <filter>
+                                    <artifact>local.dbbench:tableMigration</artifact>
+                                    <excludes>
+                                        <exclude>log4j2.xml</exclude>
+                                        <exclude>columnMap.xml</exclude>
+                                        <exclude>dbsql.xml</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>local.dbbench:InsertIntoOracle</artifact>
+                                    <excludes>
+                                        <exclude>log4j2.xml</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <transformers>
+                                <!--
+                                  必须合并而非覆盖 META-INF/services/。
+                                  12 个依赖带 services 条目，其中 7 个是 java.sql.Driver。
+                                  驱动本身走 Class.forName 不受影响，但 log4j-slf4j-impl 的
+                                  SLF4JServiceProvider 和 log4j-api 的 Provider 依赖 SPI 发现，
+                                  被覆盖后日志会直接失效。
+                                -->
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>org.testController.Start</mainClass>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
 </project>

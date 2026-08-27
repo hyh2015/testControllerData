@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  调度器自身的日志配置。文件名用 log4j2.xml 是为了让 log4j2 自动加载，
+  启动命令无需附加 -D 参数。
+
+  三个程序打在同一个 fat jar 里，日志配置无法再靠同名 log4j2.xml 区分，
+  因此拆成三份：本文件给调度器，log4j2-reader.xml 给随机读负载，
+  log4j2-writer.xml 给入库负载。后两者由 JavaProcessExecutor 启动子进程时
+  用 -Dlog4j.configurationFile 显式指定。
+
+  改造前调度器自身没有日志配置，实际是"借用"了 tableMigration.jar 里的那份
+  （Class-Path 中它排在 InsertIntoOracle.jar 之前），日志混进 logs/tableMigration.log。
+  现在各归各位。
+-->
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d [%-5p][%t] %m %throwable{full} (%C:%F:%L) %n"/>
+        </Console>
+
+        <RollingFile name="RollingFile" fileName="logs/controller.log"
+                     filePattern="logs/controller-%d{yyyy-MM-dd}.log" append="true">
+            <PatternLayout>
+                <Pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [%t] (%l) - %m%n</Pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy modulate="true" interval="24"/>
+            </Policies>
+        </RollingFile>
+
+        <RollingFile name="errorLog" fileName="logs/error-controller.log"
+                     filePattern="logs/error-controller-%d{yyyy-MM-dd}.log" append="true">
+            <ThresholdFilter level="error" onMatch="ACCEPT" onMismatch="DENY"/>
+            <PatternLayout>
+                <Pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [%t] (%l) - %m%n</Pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy modulate="true" interval="24"/>
+            </Policies>
+        </RollingFile>
+    </Appenders>
+    <Loggers>
+        <asyncRoot level="info" includeLocation="true" additivity="true">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="RollingFile"/>
+            <AppenderRef ref="errorLog"/>
+        </asyncRoot>
+    </Loggers>
+</Configuration>

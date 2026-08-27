@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  随机读负载（tableMigration，主类 com.test.Test）的日志配置。
+
+  由 tableMigration/src/main/resources/log4j2.xml 移植而来，输出文件名保持不变。
+  原文件在 shade 时被排除（与 InsertIntoOracle 的同名文件互相覆盖），改由此处提供。
+
+  error 日志单独成文件：场景 5 会让读、写两个子进程并发跑，
+  若共用一个 error.log，两个 JVM 同时追加会互相穿插。
+-->
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d [%-5p][%t] %m %throwable{full} (%C:%F:%L) %n"/>
+        </Console>
+
+        <RollingFile name="RollingFile" fileName="logs/tableMigration.log"
+                     filePattern="logs/tableMigration-%d{yyyy-MM-dd}.log" append="true">
+            <PatternLayout>
+                <Pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [%t] (%l) - %m%n</Pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy modulate="true" interval="24"/>
+            </Policies>
+        </RollingFile>
+
+        <RollingFile name="errorLog" fileName="logs/error-reader.log"
+                     filePattern="logs/error-reader-%d{yyyy-MM-dd}.log" append="true">
+            <ThresholdFilter level="error" onMatch="ACCEPT" onMismatch="DENY"/>
+            <PatternLayout>
+                <Pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [%t] (%l) - %m%n</Pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy modulate="true" interval="24"/>
+            </Policies>
+        </RollingFile>
+    </Appenders>
+    <Loggers>
+        <asyncRoot level="info" includeLocation="true" additivity="true">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="RollingFile"/>
+            <AppenderRef ref="errorLog"/>
+        </asyncRoot>
+    </Loggers>
+</Configuration>
