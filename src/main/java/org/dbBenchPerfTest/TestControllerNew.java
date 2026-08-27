@@ -17,31 +17,33 @@ public class TestControllerNew {
     }
 
     public void runAllTests() throws Exception {
-        if (DbManager.isEnabled("scene.mock.enabled")) {
+        // 场景开关缺失时一律按不执行处理：漏配置不该意外多跑一个耗时几小时、
+        // 还会 DROP/TRUNCATE 表的场景。
+        if (DbManager.isEnabled("scene.mock.enabled", false)) {
             new ScenarioMockData(config).run(db);
         }
-        if (DbManager.isEnabled("scene.createPartition.enabled")) {
+        if (DbManager.isEnabled("scene.createPartition.enabled", false)) {
             db.createPartitionTable();
         }
-        if (DbManager.isEnabled("scene1.enabled")) {
+        if (DbManager.isEnabled("scene1.enabled", false)) {
             new Scenario1(config).run(db);
         }
-        if (DbManager.isEnabled("scene2.enabled")) {
+        if (DbManager.isEnabled("scene2.enabled", false)) {
             new Scenario2(config).run(db);
         }
-        if (DbManager.isEnabled("scene3.enabled")) {
+        if (DbManager.isEnabled("scene3.enabled", false)) {
             new Scenario3(config).run(db);
         }
-        if (DbManager.isEnabled("scene4.enabled")) {
+        if (DbManager.isEnabled("scene4.enabled", false)) {
             new Scenario4(config).run(db);
         }
-        if (DbManager.isEnabled("scene5.enabled")) {
+        if (DbManager.isEnabled("scene5.enabled", false)) {
             new Scenario5(config).run(db);
         }
-        if (DbManager.isEnabled("GBbase8s.read.enabled")){
+        if (DbManager.isEnabled("GBbase8s.read.enabled", false)){
             new GBaseRandomReadSecnario(config).run(db);
         }
-        if (DbManager.isEnabled("GBbase8s.readAndinsert.enabled")){
+        if (DbManager.isEnabled("GBbase8s.readAndinsert.enabled", false)){
             new GBaseReadAndInsertSecnario(config).run(db);
         }
     }

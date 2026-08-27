@@ -110,8 +110,11 @@ GBbase8s.readAndinsert.enabled=false
 
 `TestControllerNew.runAllTests()` 就是按这些开关逐个 `if` 判断的，没有其它筛选机制。
 
-⚠️ `DbManager.isEnabled(key)` **缺省值是 `true`** —— 配置里漏写某个键 = 该场景会跑。
-所以关场景要显式写 `=false`，不能靠删行。
+`DbManager.isEnabled(key, defaultValue)` **强制每个调用点显式传缺省值**，不提供
+隐式默认的无参重载。场景/安装类开关（`scene*.enabled`、`is.install.ivory`）传 `false`——
+漏配置不该意外多跑一个耗时的场景或触发一次没人要求的装库；安全检查类开关
+（`hardware.check.enabled`）传 `true`——漏配置时默认去检查，比默默跳过更安全。
+新增开关调用点时记得想清楚这个键该属于哪一类。
 
 仓库里 `allconf.properties` 当前**全部场景开关都是 `false`**（安全默认），
 `db.type=kingbase`、`is.install.ivory=false`。跑之前需要按需打开。
