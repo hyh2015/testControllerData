@@ -21,44 +21,78 @@ public class DatabaseInstaller {
     static final String X86_PACKAGE = DbManager.getProperty("X86_PACKAGE");
     static final String ARM_PACKAGE = DbManager.getProperty("ARM_PACKAGE");
 
-    public void installDatabase(String dbName){
+    /**
+     * 安装数据库。任何一步不成立都直接抛出，不允许带着「没装成的库」继续跑压测 ——
+     * 否则真正的失败原因会被后续「无法获取数据库连接」掩盖，排查时容易误判成网络或配置问题。
+     *
+     * @param dbName 数据库名，仅用于日志
+     * @throws IllegalStateException 架构无法识别、包名未配置、脚本改写失败、
+     *                               安装未成功或安装后状态检查不通过
+     */
+    public void installDatabase(String dbName) {
 
-        try{
-            String archName = checkSystemArch();
-            String rpmPackageName = "";
-            logger.info("检测到当前操作系统架构为：" + archName);
+        String archName;
+        try {
+            archName = checkSystemArch();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("检测系统架构时被中断。", e);
+        } catch (IOException e) {
+            throw new IllegalStateException("检测系统架构失败，无法确定安装包。", e);
+        }
+        logger.info("检测到当前操作系统架构为：{}", archName);
 
-            if (archName.contains("x86_64")){
-                rpmPackageName = X86_PACKAGE;
-            }else if (archName.contains("aarch64")){
-                rpmPackageName = ARM_PACKAGE;
-            }else {
-                logger.error("未知架构，无法确定安装包！");
-            }
-
-            // 修改安装脚本中对应架构的数据库名后返回脚本名
-            File scriptFile = updateSetupScript(rpmPackageName);
-
-            String installCommand = scriptFile.getAbsolutePath() + " -o install -t common -u mycat";
-
-            logger.info("---------------["+installCommand+"]------------------");
-
-            boolean successed = execInstallCommand(installCommand);
-
-            boolean checkIsRunning = checkDatabaseStatus();
-
-            if (successed && checkIsRunning) {
-                System.out.println("============================数据库：["+dbName+"]安装成功，状态正常。==========================");
-            } else {
-                System.out.println("安装失败，请检查脚本输出或日志。");
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.out.println("安装过程出现异常。");
+        String rpmPackageName;
+        if (archName.contains("x86_64")) {
+            rpmPackageName = X86_PACKAGE;
+        } else if (archName.contains("aarch64")) {
+            rpmPackageName = ARM_PACKAGE;
+        } else {
+            throw new IllegalStateException(
+                    "未知的系统架构 [" + archName + "]，无法确定安装包，目前仅支持 x86_64 与 aarch64。");
         }
 
+        // 包名为空时会被原样写进 setupivory.sh，既改坏脚本又必然安装失败，
+        // 所以要在改写脚本之前拦住。
+        if (rpmPackageName == null || rpmPackageName.trim().isEmpty()) {
+            throw new IllegalStateException("架构 [" + archName + "] 对应的安装包名未配置，"
+                    + "请检查 allconf.properties 中的 X86_PACKAGE / ARM_PACKAGE。");
+        }
 
+        // 修改安装脚本中对应架构的数据库名后返回脚本名
+        File scriptFile;
+        try {
+            scriptFile = updateSetupScript(rpmPackageName);
+        } catch (IOException e) {
+            throw new IllegalStateException("改写安装脚本 setupivory.sh 失败：" + e.getMessage(), e);
+        }
+
+        String installCommand = scriptFile.getAbsolutePath() + " -o install -t common -u mycat";
+
+        logger.info("---------------[{}]------------------", installCommand);
+
+        boolean successed;
+        try {
+            successed = execInstallCommand(installCommand);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("执行安装脚本时被中断。", e);
+        } catch (IOException e) {
+            throw new IllegalStateException("执行安装脚本失败：" + e.getMessage(), e);
+        }
+
+        if (!successed) {
+            throw new IllegalStateException("数据库 [" + dbName + "] 安装失败："
+                    + "安装脚本输出中未出现成功标记，请检查上方 [安装输出] 日志。");
+        }
+
+        if (!checkDatabaseStatus()) {
+            throw new IllegalStateException("数据库 [" + dbName + "] 安装脚本已执行完成，"
+                    + "但状态检查未通过（ivorysql 进程或端口 " + instancePort() + " 未就绪），"
+                    + "请确认数据库是否正常启动，以及 allconf.properties 里的端口与安装脚本是否一致。");
+        }
+
+        logger.info("============================数据库：[{}]安装成功，状态正常。==========================", dbName);
     }
 
 
@@ -76,9 +110,14 @@ public class DatabaseInstaller {
                 return false;
             }
 
-            // 检查端口监听
-            if (!execShellCheck("ss -lntp | grep 5966")) {
-                logger.warn("未检测到端口 5966 监听，数据库可能未启动！");
+            // 检查端口监听。端口取自 allconf.properties 的 {db.type}.port，
+            // 不能写死 —— 不同版本的 setupivory.sh 默认端口不一样（5.3 是 5966，
+            // 5.4 的脚本里已经变了），写死会在装成功之后误报「数据库未启动」。
+            String port = instancePort();
+            if (!execShellCheck("ss -lntp | grep " + port)) {
+                logger.warn("未检测到端口 {} 监听，数据库可能未启动！"
+                        + "若数据库实际在其它端口上，请把 allconf.properties 里的 {}.port 改成与安装脚本一致。",
+                        port, DbManager.getProperty("db.type"));
                 return false;
             }
 
@@ -89,6 +128,21 @@ public class DatabaseInstaller {
             logger.error("检查数据库状态时发生异常: ", e);
             return false;
         }
+    }
+
+    /**
+     * 取当前数据库实例的端口，用于安装后的监听检查。
+     *
+     * <p>取的是 allconf.properties 里的 {db.type}.port —— 装库只在 db.type=ivory 时执行
+     * （见 Start），所以实际读的是 ivory.port，与 JDBC 连接用的是同一个值，不会两处打架。
+     */
+    private String instancePort() {
+        String dbType = DbManager.getProperty("db.type");
+        String port = DbManager.getProperty(dbType + ".port");
+        if (port == null || port.trim().isEmpty()) {
+            throw new IllegalStateException("未配置 " + dbType + ".port，无法检查数据库监听端口。");
+        }
+        return port.trim();
     }
 
     /**
@@ -120,7 +174,24 @@ public class DatabaseInstaller {
      * 直接修改 setupivory.sh 文件中 g_database_rpm_file 的值
      * 不再创建临时文件。
      */
-    private File updateSetupScript(String rpmFileName) throws IOException {
+    /** 安装脚本里存放安装包文件名的变量。不同版本的 setupivory.sh 用的名字不一样：
+     *  rpm 版脚本是 g_database_rpm_file，deb 版（5.4 起）改成了 g_database_deb_file。 */
+    private static final String[] PACKAGE_VARS = {"g_database_rpm_file=", "g_database_deb_file="};
+
+    /** 存放数据目录的变量，目前各版本一致。 */
+    private static final String DATA_VAR = "g_database_data=";
+
+    /**
+     * 把 allconf.properties 里配置的安装包名和数据目录写进 setupivory.sh。
+     *
+     * <p>脚本里找不到对应变量时会直接抛错，而不是「改了个寂寞」——
+     * 曾经因为 5.4 版脚本把 g_database_rpm_file 改名成 g_database_deb_file，
+     * 这里静默地什么都没改，脚本用了自己硬编码的默认包名，排查时极难发现。
+     *
+     * @param packageFileName 按当前架构选出的安装包文件名
+     * @throws IllegalStateException 脚本中找不到存放包名或数据目录的变量
+     */
+    private File updateSetupScript(String packageFileName) throws IOException {
         File scriptFile = new File(scriptPath, "setupivory.sh");
         String mountPath = DbManager.getProperty("mount.path");
 
@@ -128,22 +199,40 @@ public class DatabaseInstaller {
             throw new FileNotFoundException("找不到 setupivory.sh 脚本！路径: " + scriptFile.getAbsolutePath());
         }
 
-        logger.info("准备修改脚本 [{}] 中的 rpm 包名为: {},ivory数据库的数据目录为：{}", scriptFile.getAbsolutePath(), rpmFileName,mountPath);
+        logger.info("准备修改脚本 [{}] 中的安装包名为: {}，ivory数据库的数据目录为：{}",
+                scriptFile.getAbsolutePath(), packageFileName, mountPath);
+
+        String matchedPackageVar = null;
+        boolean dataVarMatched = false;
 
         // 读取整个文件
         StringBuilder content = new StringBuilder();
         try (BufferedReader reader = new BufferedReader(new FileReader(scriptFile))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                if (line.startsWith("g_database_rpm_file=")) {
+                String packageVar = matchPackageVar(line);
+                if (packageVar != null) {
                     // 替换为新的包名
-                    line = "g_database_rpm_file=\"" + rpmFileName + "\"";
-                } else if (line.startsWith("g_database_data=")) {
+                    line = packageVar + "\"" + packageFileName + "\"";
+                    matchedPackageVar = packageVar;
+                } else if (line.startsWith(DATA_VAR)) {
                     // 更新数据库的数据目录
-                    line = "g_database_data=\"" + mountPath + "\"";
+                    line = DATA_VAR + "\"" + mountPath + "\"";
+                    dataVarMatched = true;
                 }
                 content.append(line).append(System.lineSeparator());
             }
+        }
+
+        if (matchedPackageVar == null) {
+            throw new IllegalStateException("安装脚本 " + scriptFile.getAbsolutePath()
+                    + " 中找不到存放安装包名的变量（试过 " + String.join(" / ", PACKAGE_VARS) + "）。"
+                    + "allconf.properties 里配置的包名不会生效，请确认脚本版本与本程序是否匹配。");
+        }
+        if (!dataVarMatched) {
+            throw new IllegalStateException("安装脚本 " + scriptFile.getAbsolutePath()
+                    + " 中找不到变量 " + DATA_VAR + "，mount.path 配置不会生效，"
+                    + "数据目录可能落到脚本默认路径（未必在挂载盘上），请确认脚本版本。");
         }
 
         // 写回文件（覆盖原内容）
@@ -154,8 +243,18 @@ public class DatabaseInstaller {
         // 确保脚本可执行
         scriptFile.setExecutable(true);
 
-        logger.info("setupivory.sh 文件已更新完毕！");
+        logger.info("setupivory.sh 文件已更新完毕！包名写入变量 {}", matchedPackageVar);
         return scriptFile;
+    }
+
+    /** 返回该行匹配上的包名变量前缀，没匹配上返回 null。 */
+    private static String matchPackageVar(String line) {
+        for (String var : PACKAGE_VARS) {
+            if (line.startsWith(var)) {
+                return var;
+            }
+        }
+        return null;
     }
 
 
