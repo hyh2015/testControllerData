@@ -111,10 +111,10 @@ GBbase8s.readAndinsert.enabled=false
 `TestControllerNew.runAllTests()` 就是按这些开关逐个 `if` 判断的，没有其它筛选机制。
 
 `DbManager.isEnabled(key, defaultValue)` **强制每个调用点显式传缺省值**，不提供
-隐式默认的无参重载。场景/安装类开关（`scene*.enabled`、`is.install.ivory`）传 `false`——
-漏配置不该意外多跑一个耗时的场景或触发一次没人要求的装库；安全检查类开关
-（`hardware.check.enabled`）传 `true`——漏配置时默认去检查，比默默跳过更安全。
-新增开关调用点时记得想清楚这个键该属于哪一类。
+隐式默认的无参重载。目前全部调用点都传 `false`（`scene*.enabled`、`is.install.ivory`、
+`hardware.check.enabled`）——漏配置不该意外多跑一个耗时的场景、触发一次没人要求的
+装库，或者要求一台没有 storcli 的机器必须装 MegaRAID 工具才能启动。
+以后如果某个新开关"漏配置更应该默认执行"，调用点传 `true` 即可。
 
 仓库里 `allconf.properties` 当前**全部场景开关都是 `false`**（安全默认），
 `db.type=kingbase`、`is.install.ivory=false`。跑之前需要按需打开。
@@ -155,7 +155,7 @@ Start.main()
   │  是 ivory 则走 CheckDatabaseInstall（rpm 检测 + 自动装库）
   │  ← 装库为 fail-fast：架构未知/包名未配置/脚本改写失败/安装未出成功标记/
   │     装完状态检查不过，任一不成立都抛 IllegalStateException 终止
-  ├─ hardware.check.enabled=true（缺省）时：CheckHardware.checkStorageHealth()
+  ├─ hardware.check.enabled=true（缺省 false，不检查）时：CheckHardware.checkStorageHealth()
   │  ← 硬盘/RAID 预检，storcli 不可用或检出异常均不通过，System.exit(1)
   └─ TestControllerNew(new TestConfig(dbType)).runAllTests()
        ├─ DatabaseFactory.getDatabase(config) → DatabaseInface 实现
@@ -228,9 +228,10 @@ Scenario3 依赖 Scenario2 产出的 `tb_usernum_list1`（会被 rename 成 `tb_
 - **`DatabaseInface` 只覆盖 3 个操作**（`createPartitionTable` / `copyData` / `createPartIndexes`）。
   场景 2/4/5 对应的接口方法在源码里是注释状态，这些场景直接调 `org.testController.*`
   的静态工具类，绕过了策略体系。
-- **`CheckHardware` 是 fail-closed**：`storcli64`（路径硬编码 `/opt/MegaRAID/storcli/storcli64`）
-  不可执行、执行失败或退出码非 0 时预检一律不通过 —— 「没检成」不等于「检查通过」。
-  非 MegaRAID 机器需用 `hardware.check.enabled=false` 跳过，否则程序启动即退出。
+- **`CheckHardware` 本身是 fail-closed，但整体开关缺省不检查**：`hardware.check.enabled`
+  缺省 `false`，因为大多数实际部署的测试服务器没有 MegaRAID。显式置 `true` 之后，
+  `storcli64`（路径硬编码 `/opt/MegaRAID/storcli/storcli64`）不可执行、执行失败或
+  退出码非 0 时预检一律不通过，程序启动即退出 —— 「没检成」不等于「检查通过」。
 - **SQL 全部字符串拼接**，表名来自配置。这是内网压测工具的既有形态，改动时保持一致即可，
   但不要把外部不可信输入接进来。
 - **日志配置有三份**（`log4j2.xml` 调度器 / `log4j2-reader.xml` 随机读 / `log4j2-writer.xml` 入库）。
@@ -240,6 +241,12 @@ Scenario3 依赖 Scenario2 产出的 `tb_usernum_list1`（会被 rename 成 `tb_
   代码从不直接引用 rpm 路径，只把包名写进脚本的 `g_database_rpm_file=`，
   再以 `scriptPath` 为工作目录执行脚本 —— 裸文件名靠 CWD 解析。
   包名与 `X86_PACKAGE` / `ARM_PACKAGE` 必须逐字符一致。
+- **`scriptPath` 下还必须放一个 `ivory.init.ivorysql.sql`**，`setupivory.sh` 内部按
+  `$workdir/ivory.init.ivorysql.sql`（`$workdir` 即脚本自身工作目录）查找，
+  缺失时对应初始化步骤直接 `return 1`，我们的 Java 侧只认"安装脚本输出未出现成功标记"，
+  会表现为一次不易定位原因的安装失败。脚本里还定义了 `ivory.init.sysdba.sql` /
+  `ivory.init.syssso.sql` 两个同名机制的初始化文件，但对应调用在脚本里被**注释掉了**
+  （`funcInitSyssso` / `funcInitSysdba` 未被激活），这两个文件不需要准备。
 - **类名拼写错误**：`PrepareSecnarioEnvironment`、`GBaseRandomReadSecnario`、
   `GBaseReadAndInsertSecnario` 里是 `Secnario` 而非 `Scenario`，搜索时注意。
 - **`Mockdata.waitForVaildFiles` 会一直阻塞到数据文件齐备 —— 这是有意设计**：

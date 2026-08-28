@@ -32,16 +32,16 @@ public class Start {
 
         /**
          * 判断服务器硬盘是否正常
-         * 非 MegaRAID 机器（无 storcli）可将 hardware.check.enabled 置为 false 跳过
+         * 需要 MegaRAID 机器（有 storcli）才能跑，显式将 hardware.check.enabled 置为 true 开启；
+         * 缺省不检查 —— 实际部署的测试服务器大多没有 storcli，显式开关比强制人人都要关一遍更省事。
          */
-        // 缺失时按需要检查处理：漏配置默认去做硬盘检查，比默默跳过更安全。
-        if (DbManager.isEnabled("hardware.check.enabled", true)) {
+        if (DbManager.isEnabled("hardware.check.enabled", false)) {
             if (!new CheckHardware().checkStorageHealth()) {
                 logger.error("由于服务器硬盘状态异常，为保证压测数据准确性，程序已经自动终止。");
                 System.exit(1); //强制退出
             }
         } else {
-            logger.warn("已配置 hardware.check.enabled=false，跳过硬盘预检。"
+            logger.warn("未开启 hardware.check.enabled（缺省即不检查，需要检查请显式置为 true）。"
                     + "磁盘若存在坏盘或 Raid 降级将无法被发现，压测数据可能失真。");
         }
 

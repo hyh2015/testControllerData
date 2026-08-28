@@ -27,14 +27,14 @@
 yum install -y sysstat dstat expect
 ```
 
-> ⚠️ **默认情况下 storcli 是硬性前置条件。** 程序启动时执行磁盘预检，
-> 若 storcli 未安装、路径不是 `/opt/MegaRAID/storcli/storcli64`、无执行权限或退出码非 0，
-> 预检一律判定不通过，程序 `System.exit(1)` 终止。
-> 这是有意设计：无法确认磁盘状态时，压测数据不具备参考价值。
+> ⚠️ **`hardware.check.enabled` 缺省不检查**（大多数实际部署的测试服务器没有 MegaRAID）。
+> 需要检查的 MegaRAID 机器，在 `allconf.properties` 中显式置 `hardware.check.enabled=true`：
+> 程序启动时会执行磁盘预检，若 storcli 未安装、路径不是
+> `/opt/MegaRAID/storcli/storcli64`、无执行权限或退出码非 0，预检一律判定不通过，
+> 程序 `System.exit(1)` 终止。这是有意设计：既然主动要求了检查，
+> 无法确认磁盘状态时压测数据就不具备参考价值。
 >
-> **非 MegaRAID 机器**（云主机、软 RAID 等）在 `allconf.properties` 中置
-> `hardware.check.enabled=false` 即可跳过整个预检。跳过后磁盘坏盘或 Raid 降级
-> 将无法被发现，启动日志会打出一条 WARN 提示。
+> **不开启检查时**，磁盘坏盘或 Raid 降级将无法被发现，启动日志会打出一条 WARN 提示。
 
 ### 1.2 磁盘容量
 
@@ -90,7 +90,8 @@ LIB_DIR=/path/to/libDBB ./install-libs.sh
 
 ### 2.2 部署
 
-上传到服务器数据盘目录下，运行目录只需三个文件：
+**只跑压测、不需要本程序自动装库**（`is.install.ivory=false`，对接一个已经装好的数据库）
+时，上传到服务器数据盘目录下，运行目录只需三个文件：
 
 ```
 部署目录/
@@ -102,6 +103,11 @@ LIB_DIR=/path/to/libDBB ./install-libs.sh
 > `mockdata.jar` 之所以不并入：它自身就是 8.7 MB 的自包含 fat jar，内置 logback，
 > 与主程序的 log4j2 绑定冲突；且它本来就通过运行时生成的 `mock.sh` 独立调用。
 > 不启用 `scene.mock.enabled` 时甚至不需要上传它。
+
+**如果需要本程序自动安装 IvorySQL**（`is.install.ivory=true`），除了上面三个文件，
+还要**额外**上传 `setupivory.sh` 和对应架构的 rpm 安装包——这两个文件**不放在
+上面这个部署目录里**，而是放在 `allconf.properties` 里 `scriptPath` 指定的**另一个
+独立目录**下。完整说明见下面 [3.2 安装 IvorySQL 时的额外配置](#32-安装-ivorysql-时的额外配置)。
 
 **不需要**上传 `config.properties`、`l2o.properties`、`mock.sh` —— 这三个文件由程序
 在运行时自动生成并整体覆盖，手工编辑不会生效。
@@ -146,8 +152,8 @@ ivory.database=ivorysql
 # 测试数据文件存放路径，必须在已挂载的数据盘下（约需 1.5TB）
 data.path=/已挂载磁盘目录/TestControllerData/datafile
 
-# 硬盘/Raid 预检开关，缺省 true；非 MegaRAID 机器置 false 跳过
-hardware.check.enabled=true
+# 硬盘/Raid 预检开关，缺省 false（不检查）；MegaRAID 机器需要检查时显式置 true
+hardware.check.enabled=false
 ```
 
 > 新增数据库类型时，`{db.type}.driver` / `.url` / `.host` / `.port` / `.user` /
@@ -173,7 +179,8 @@ ARM_PACKAGE=IvorySQL-5.3-xxxx.aarch64.rpm
 ```
 /已挂载磁盘目录/ivoryTest/                          ← scriptPath
 ├── setupivory.sh                                  # 安装脚本，必须存在
-└── IvorySQL-5.3-xxxx.x86_64.rpm                   # 与脚本同目录，按架构放对应包
+├── IvorySQL-5.3-xxxx.x86_64.rpm                   # 与脚本同目录，按架构放对应包
+└── ivory.init.ivorysql.sql                        # 数据库初始化 SQL，必须存在
 
 /已挂载磁盘目录/TestControllerData/                  ← 主程序部署目录
 ├── TestControllerData.jar
@@ -186,14 +193,24 @@ ARM_PACKAGE=IvorySQL-5.3-xxxx.aarch64.rpm
 而安装命令执行时工作目录被设为 `scriptPath`（`builder.directory(new File(scriptPath))`），
 所以脚本里的裸文件名是相对 `scriptPath` 解析的。
 
+> ⚠️ **`ivory.init.ivorysql.sql` 容易被漏掉，是实测踩过的坑**：`setupivory.sh` 内部按
+> `$workdir/ivory.init.ivorysql.sql`（`$workdir` 即脚本自身工作目录，也就是 `scriptPath`）
+> 查找这个文件，缺失时对应的初始化步骤直接失败，而这个失败会一路传导成
+> "安装脚本输出中未出现成功标记"——排查起来不容易看出是这一个文件的问题。
+>
+> 脚本里还定义了 `ivory.init.sysdba.sql` / `ivory.init.syssso.sql` 两个类似机制的文件，
+> 但对应的初始化调用在脚本里是**被注释掉的**（`funcInitSyssso` / `funcInitSysdba`
+> 从未被激活），这两个文件不需要准备。
+
 检查清单：
 
 1. `setupivory.sh` 已放入 `scriptPath`，且当前用户有读写权限（程序会**改写**这个文件）
 2. 对应架构的 rpm 已放入同一目录，用 `uname -m` 确认架构后放 x86_64 或 aarch64 的包
 3. **rpm 文件名与 `X86_PACKAGE` / `ARM_PACKAGE` 的值逐字符一致** ——
    程序按 `uname -m` 选其一原样写进脚本，名字对不上脚本就找不到包
-4. `mount.path` 指向的数据目录在挂载盘下，且为空或不存在
-5. 已安装 `expect`（安装脚本的交互自动化依赖它）
+4. **`ivory.init.ivorysql.sql` 已放入 `scriptPath`**（与 `setupivory.sh` 同目录）
+5. `mount.path` 指向的数据目录在挂载盘下，且为空或不存在
+6. 已安装 `expect`（安装脚本的交互自动化依赖它）
 
 要点：
 
@@ -244,8 +261,9 @@ GBbase8s.readAndinsert.enabled=false
   - 场景 3 依赖场景 2 产出的 `tb_usernum_list1`（会被改名为 `tb_usernum_list`），
     找不到会抛 `RuntimeException` 中断
   - 全部按顺序执行则无此问题
-- **漏写某个开关等于开启**：读取逻辑 `DbManager.isEnabled(key)` 的缺省值是 `true`，
-  关闭场景必须显式写 `=false`，不能靠删除该行。
+- **漏写场景开关等于关闭**：`DbManager.isEnabled(key, defaultValue)` 强制每个调用点
+  显式声明缺省值，场景类开关（`scene*.enabled`、`GBbase8s.*`）缺省都是 `false`，
+  漏写某一行 = 该场景不会跑，不会意外多跑。
 
 ### 3.4 影响单轮耗时的参数
 

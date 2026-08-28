@@ -65,10 +65,12 @@ public class DbManager {
      *
      * <p>不提供无参重载、强制每次调用都显式传 defaultValue —— 是为了让"配置里漏写
      * 这个键该怎么办"这件事在调用点就能看到，不必去翻这个方法的实现才知道。
-     * 场景/安装类开关（scene*.enabled、is.install.ivory）该传 false：
-     * 漏配置不该意外多跑一个耗时的场景，或触发一次没人要求的安装。
-     * 安全检查类开关（hardware.check.enabled）该传 true：
-     * 漏配置时默认去做检查，比默默跳过更安全。
+     * 目前全部调用点都传 false：场景/安装类开关（scene*.enabled、is.install.ivory）
+     * 漏配置不该意外多跑一个耗时的场景或触发一次没人要求的安装；
+     * hardware.check.enabled 缺省也不检查，因为大多数实际部署的测试服务器没有 storcli，
+     * 需要检查的机器显式置 true 即可。
+     * 以后如果加一个"漏配置更应该默认执行"的开关，在调用点传 true 即可，
+     * 不需要改这个方法本身。
      *
      * @param key 配置键名
      * @param defaultValue 键缺失时的默认值
